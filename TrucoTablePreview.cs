@@ -709,7 +709,10 @@ namespace TrucoRDR2
             if (round.TrucoStake >= 2 && strength <= 12 && _random.NextDouble() < 0.30)
             {
                 if (round.Fold(TrucoPlayer.Opponent))
+                {
+                    RefreshSprites();
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Win);
+                }
                 return;
             }
 
@@ -1237,9 +1240,11 @@ namespace TrucoRDR2
 
             // Argentine truco requires the envido winner to prove the announced points.
             // Show the opponent's hand face-up until the first card of the truco is played.
-            if (round.CardsPlayed == 0 && round.EnvidoResolved &&
+            if (round.IsComplete && round.EnvidoResolved &&
                 round.EnvidoWinner == TrucoPlayer.Opponent)
             {
+                // Played cards already prove part of the envido; show only remaining cards
+                // face-up at the end of the hand, avoiding duplicate sprites on the table.
                 IList<TrucoCard> opponentCards = round.OpponentCards;
                 for (int i = 0; i < opponentCards.Count && i < _opponentRevealSprites.Length; i++)
                 {
