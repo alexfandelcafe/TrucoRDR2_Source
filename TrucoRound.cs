@@ -232,7 +232,9 @@ namespace TrucoRDR2
                 {
                     if (!CanRaiseEnvido(player, call)) return false;
                     _envidoBasePoints = _envidoTotal;
-                    _envidoBaseWinner = PendingCaller.Value;
+                    // If the responder raises and the original caller refuses, the raiser
+                    // wins the previously established envido amount.
+                    _envidoBaseWinner = player;
                 }
             }
             else
@@ -247,7 +249,9 @@ namespace TrucoRDR2
             if (call == TrucoCall.RealEnvido) _realEnvidoCalled = true;
             if (call == TrucoCall.FaltaEnvido) _faltaEnvidoCalled = true;
 
-            _envidoTotal = _envidoBasePoints + callValue;
+            // Falta Envido replaces the accepted total when wanted; previous calls only
+            // determine the points awarded if the last raise is refused.
+            _envidoTotal = call == TrucoCall.FaltaEnvido ? callValue : _envidoBasePoints + callValue;
             SetPending(call, player, OtherPlayer(player), _envidoTotal);
             LastAnnouncement = PlayerName(player) + " canta " + CallName(call) + ".";
             return true;
@@ -301,7 +305,8 @@ namespace TrucoRDR2
             if (!CanRaiseFlor(player, call)) return false;
 
             _florBasePoints = _florTotal;
-            _florBaseWinner = PendingCaller.Value;
+            // A refused raise awards the previous stake to the player who made that raise.
+            _florBaseWinner = player;
             _florTotal = call == TrucoCall.ContraFlor
                 ? 6
                 : CalculateFaltaPoints();
@@ -364,6 +369,20 @@ namespace TrucoRDR2
                 CurrentPlayer = trick.Winner.HasValue ? trick.Winner.Value : trick.FirstPlayer;
 
             return trick;
+        }
+
+        /// <summary>Concedes the hand to the opponent for the currently accepted truco stake.</summary>
+        public bool Fold(TrucoPlayer player)
+        {
+            if (IsComplete || HasPendingResponse || player != CurrentPlayer)
+                return false;
+
+            TrucoPlayer winner = OtherPlayer(player);
+            int points = TrucoStake;
+            LastAnnouncement = PlayerName(player) + " se va al mazo. " +
+                               PlayerName(winner) + " gana " + points + " punto(s).";
+            Complete(winner, points, "Se fue al mazo");
+            return true;
         }
 
         public int TricksWonBy(TrucoPlayer player)
