@@ -98,6 +98,8 @@ namespace TrucoRDR2
         public int TrucoStake { get { return _trucoLevel + 1; } }
         public int TrucoLevel { get { return _trucoLevel; } }
         public bool FlorEnabled { get; private set; }
+        public bool PlayerHadFlor { get; private set; }
+        public bool OpponentHadFlor { get; private set; }
         public bool EnvidoResolved { get { return _envidoResolved; } }
         public TrucoPlayer? EnvidoWinner { get; private set; }
         public bool FlorResolved { get { return _florResolved; } }
@@ -149,6 +151,9 @@ namespace TrucoRDR2
                     _playerCards.Add(deck[i * 2 + 1]);
                 }
             }
+
+            PlayerHadFlor = TrucoRules.HasFlor(_playerCards);
+            OpponentHadFlor = TrucoRules.HasFlor(_opponentCards);
             LastAnnouncement = "Se repartieron tres cartas a cada jugador.";
         }
 
@@ -160,8 +165,8 @@ namespace TrucoRDR2
 
             if (!FlorEnabled) return;
 
-            bool playerHasFlor = TrucoRules.HasFlor(_playerCards);
-            bool opponentHasFlor = TrucoRules.HasFlor(_opponentCards);
+            bool playerHasFlor = PlayerHadFlor;
+            bool opponentHasFlor = OpponentHadFlor;
 
             if (playerHasFlor && opponentHasFlor)
             {
