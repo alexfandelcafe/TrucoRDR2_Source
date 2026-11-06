@@ -65,7 +65,7 @@ namespace TrucoRDR2
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
-                "INSERT: cerrar mesa    FLECHAS: elegir carta    ENTER: jugar    ESC: cerrar",
+                "CTRL+F9: cerrar mesa    FLECHAS: elegir carta    ENTER: jugar    ESC: cerrar",
                 new PointF(960.0f, 125.0f), 0.40f, Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
@@ -361,8 +361,8 @@ namespace TrucoRDR2
             {
                 SetCaption(_status,
                     _round.Winner == TrucoPlayer.Player
-                        ? "Ganaste la mano. INSERT reparte otra; ESC cierra la mesa."
-                        : "El rival ganó la mano. Insert reparte otra; ESC cierra la mesa.");
+                        ? "Ganaste la mano. CTRL+F9 reparte otra; ESC cierra la mesa."
+                        : "El rival ganó la mano. Ctrl+F9 reparte otra; ESC cierra la mesa.");
             }
             else if (_round.CurrentPlayer == TrucoPlayer.Player)
             {
