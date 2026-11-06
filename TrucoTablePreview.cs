@@ -362,7 +362,7 @@ namespace TrucoRDR2
                 SetCaption(_status,
                     _round.Winner == TrucoPlayer.Player
                         ? "Ganaste la mano. INSERT reparte otra; ESC cierra la mesa."
-                        : "El rival ganó la mano. F8 reparte otra; ESC cierra la mesa.");
+                        : "El rival ganó la mano. Insert reparte otra; ESC cierra la mesa.");
             }
             else if (_round.CurrentPlayer == TrucoPlayer.Player)
             {
