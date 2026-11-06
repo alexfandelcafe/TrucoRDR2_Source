@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
@@ -21,6 +22,7 @@ namespace TrucoRDR2
         private const float CardWidth = 180.0f;
         private const float CardHeight = 270.0f;
         private const float CardTop = 690.0f;
+        private const double MissingDictionaryGraceSeconds = 5.0;
 
         private readonly string _textureDictionary;
         private readonly string[] _textureNames;
@@ -30,18 +32,27 @@ namespace TrucoRDR2
         private readonly TextElement _header;
         private readonly TextElement _instructions;
         private readonly TextElement _status;
+        private readonly string _diagnosticLogPath;
 
         private bool _previewEnabled;
         private bool _toggleKeyDown;
         private bool _textureRequestSent;
         private bool _spritesCreated;
         private int _firstCardIndex;
+        private DateTime _textureRequestTimeUtc;
+        private string _lastDiagnosticState;
 
         public TrucoScript()
         {
             Interval = 0;
             _textureDictionary = ReadTextureDictionarySetting();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
+
+            string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (string.IsNullOrEmpty(scriptDirectory))
+                scriptDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+            _diagnosticLogPath = Path.Combine(scriptDirectory, "TrucoRDR2.log");
 
             _cardPositions = new[]
             {
@@ -77,6 +88,9 @@ namespace TrucoRDR2
             KeyDown += OnKeyDown;
             KeyUp += OnKeyUp;
             Aborted += OnAborted;
+
+            WriteDiagnostic("Script iniciado. Diccionario configurado: '" + _textureDictionary + "'.");
+            WriteExpectedYtdPath(scriptDirectory);
         }
 
         private void OnKeyDown(object sender, KeyEventArgs e)
@@ -136,39 +150,72 @@ namespace TrucoRDR2
             _header.Draw();
             _instructions.Draw();
 
-            bool dictionaryExists = false;
-            bool dictionaryLoaded = false;
+            bool dictionaryExists;
+            bool dictionaryLoaded;
+
             try
             {
-                // LML must register the YTD as a streaming asset before the game can request it.
-                dictionaryExists = TXD.DOES_STREAMED_TEXTURE_DICT_EXIST(_textureDictionary);
-                if (dictionaryExists)
+                // Request first. DOES_STREAMED_TEXTURE_DICT_EXIST can be false before the
+                // request is issued, so gating the request on that check prevents first-time loading.
+                if (!_textureRequestSent)
                 {
-                    dictionaryLoaded = TXD.HAS_STREAMED_TEXTURE_DICT_LOADED(_textureDictionary);
-                    if (!dictionaryLoaded && !_textureRequestSent)
-                    {
-                        // Request once; Sprite's constructor also requests the dictionary after it loads.
-                        TXD.REQUEST_STREAMED_TEXTURE_DICT(_textureDictionary, false);
-                        _textureRequestSent = true;
-                    }
+                    _textureRequestSent = true;
+                    _textureRequestTimeUtc = DateTime.UtcNow;
+                    TXD.REQUEST_STREAMED_TEXTURE_DICT(_textureDictionary, false);
+                    WriteDiagnostic("REQUEST_STREAMED_TEXTURE_DICT enviado para '" + _textureDictionary + "'.");
                 }
+
+                dictionaryExists = TXD.DOES_STREAMED_TEXTURE_DICT_EXIST(_textureDictionary);
+                dictionaryLoaded = TXD.HAS_STREAMED_TEXTURE_DICT_LOADED(_textureDictionary);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                SetStatusCaption("Error consultando el diccionario " + _textureDictionary +
-                                 ". Revisa el log de ScriptHook.");
+                string errorState = "ERROR|" + ex.GetType().FullName + "|" + ex.Message;
+                if (!string.Equals(_lastDiagnosticState, errorState, StringComparison.Ordinal))
+                {
+                    WriteDiagnostic("ERROR consultando/cargando el diccionario: " + ex);
+                    _lastDiagnosticState = errorState;
+                }
+
+                SetStatusCaption("Error de TXD (" + ex.GetType().Name + "). Ver scripts\\TrucoRDR2.log.");
                 _status.Draw();
+                DrawVisibleCardLabels();
                 return;
             }
 
-            if (!dictionaryExists)
+            string diagnosticState = dictionaryLoaded
+                ? "LOADED"
+                : (dictionaryExists ? "EXISTS_NOT_LOADED" : "NOT_FOUND");
+
+            if (!string.Equals(_lastDiagnosticState, diagnosticState, StringComparison.Ordinal))
             {
-                SetStatusCaption("LML no registro el YTD: " + _textureDictionary +
-                                 ". Revisa lml\\stream o el install.xml.");
+                WriteDiagnostic(
+                    "Estado del diccionario: " + diagnosticState +
+                    " | DOES_STREAMED_TEXTURE_DICT_EXIST=" + dictionaryExists +
+                    " | HAS_STREAMED_TEXTURE_DICT_LOADED=" + dictionaryLoaded + ".");
+                _lastDiagnosticState = diagnosticState;
             }
-            else if (!dictionaryLoaded)
+
+            if (!dictionaryLoaded)
             {
-                SetStatusCaption("YTD registrado; esperando carga: " + _textureDictionary);
+                if (!dictionaryExists)
+                {
+                    double secondsSinceRequest = (DateTime.UtcNow - _textureRequestTimeUtc).TotalSeconds;
+                    if (secondsSinceRequest < MissingDictionaryGraceSeconds)
+                    {
+                        SetStatusCaption("Solicitando YTD: " + _textureDictionary + "...");
+                    }
+                    else
+                    {
+                        SetStatusCaption(
+                            "El juego no encuentra '" + _textureDictionary +
+                            "'. Revisa ruta, nombre y formato del YTD.");
+                    }
+                }
+                else
+                {
+                    SetStatusCaption("Diccionario encontrado; esperando carga: " + _textureDictionary);
+                }
             }
             else
             {
@@ -178,6 +225,7 @@ namespace TrucoRDR2
                 {
                     RebuildVisibleSprites();
                     _spritesCreated = true;
+                    WriteDiagnostic("Diccionario cargado; sprites de vista previa creados.");
                 }
             }
 
@@ -191,6 +239,12 @@ namespace TrucoRDR2
                 // Keep texture names visible even when the YTD is missing or not loaded.
                 _cardLabels[i].Draw();
             }
+        }
+
+        private void DrawVisibleCardLabels()
+        {
+            for (int i = 0; i < CardsShown; i++)
+                _cardLabels[i].Draw();
         }
 
         private void SetStatusCaption(string caption)
@@ -211,7 +265,10 @@ namespace TrucoRDR2
                 _firstCardIndex = 0;
                 UpdateVisibleCardLabels();
                 _textureRequestSent = false;
+                _textureRequestTimeUtc = DateTime.UtcNow;
+                _lastDiagnosticState = null;
                 _spritesCreated = false;
+                WriteDiagnostic("Vista de texturas activada.");
                 RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas activada. Av Pag/Re Pag cambia las cartas.");
             }
             else
@@ -219,6 +276,8 @@ namespace TrucoRDR2
                 DisposeSprites();
                 _spritesCreated = false;
                 _textureRequestSent = false;
+                _lastDiagnosticState = null;
+                WriteDiagnostic("Vista de texturas cerrada.");
                 RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas cerrada.");
             }
         }
@@ -276,6 +335,42 @@ namespace TrucoRDR2
         {
             _previewEnabled = false;
             DisposeSprites();
+            WriteDiagnostic("Script abortado; sprites liberados.");
+        }
+
+        private void WriteExpectedYtdPath(string scriptDirectory)
+        {
+            try
+            {
+                DirectoryInfo scriptsInfo = new DirectoryInfo(scriptDirectory);
+                DirectoryInfo gameRoot = scriptsInfo.Parent;
+                if (gameRoot == null)
+                    return;
+
+                string expectedYtdPath = Path.Combine(
+                    gameRoot.FullName, "lml", "stream", _textureDictionary + ".ytd");
+                WriteDiagnostic(
+                    "YTD esperado para LML: '" + expectedYtdPath +
+                    "' | existe en disco: " + File.Exists(expectedYtdPath) + ".");
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("No se pudo comprobar la ruta esperada del YTD: " + ex.Message);
+            }
+        }
+
+        private void WriteDiagnostic(string message)
+        {
+            try
+            {
+                string line = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture) +
+                              " " + message + Environment.NewLine;
+                File.AppendAllText(_diagnosticLogPath, line);
+            }
+            catch
+            {
+                // Diagnostics must never prevent the script from running.
+            }
         }
 
         private static string ReadTextureDictionarySetting()
