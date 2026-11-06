@@ -99,7 +99,8 @@ namespace TrucoRDR2
             else if (e.KeyCode == Keys.PageUp)
             {
                 _firstCardIndex = (_firstCardIndex - 1 + _textureNames.Length) % _textureNames.Length;
-                RebuildVisibleSprites();
+                if (_spritesCreated)
+                    RebuildVisibleSprites();
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Escape)
