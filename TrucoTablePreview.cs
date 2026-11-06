@@ -1166,7 +1166,7 @@ namespace TrucoRDR2
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 27, 19, 13, 240);
             DrawRect(center.X, center.Y, middle.Width, middle.Height, 147, 103, 54, 255);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 31, 78, 54, 235);
-            DrawRect(center.X, center.Y, LayoutHeight(2.0f), LayoutHeight(165.0f), 151, 190, 128, 115);
+            DrawRect(center.X, center.Y, LayoutWidth(2.0f), LayoutHeight(165.0f), 151, 190, 128, 115);
         }
 
         private void DrawSelectedCardFrame(int index)
@@ -1264,7 +1264,7 @@ namespace TrucoRDR2
 
             // Argentine truco requires the envido winner to prove the announced points.
             // Show the opponent's hand face-up until the first card of the truco is played.
-            if (round.IsComplete && round.EnvidoResolved &&
+            if ((_match.IsComplete || round.IsComplete) && round.EnvidoResolved &&
                 round.EnvidoWinner == TrucoPlayer.Opponent)
             {
                 // Played cards already prove part of the envido; show only remaining cards
