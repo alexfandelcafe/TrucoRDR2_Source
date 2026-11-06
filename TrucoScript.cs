@@ -63,7 +63,7 @@ namespace TrucoRDR2
             _textureDictionary = ReadTextureDictionarySetting();
             _tableToggleBinding = ReadTableToggleBinding();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
-            _tablePreview = new TrucoTablePreview(_textureDictionary);
+            _tablePreview = new TrucoTablePreview(_textureDictionary, FormatKeyBinding(_tableToggleBinding));
 
             string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(scriptDirectory))
@@ -448,6 +448,19 @@ namespace TrucoRDR2
             {
                 // Diagnostics must never prevent the script from running.
             }
+        }
+
+        private static string FormatKeyBinding(KeyBinding binding)
+        {
+            string result = string.Empty;
+            if ((binding.Modifiers & Keys.Control) != Keys.None)
+                result += "Ctrl+";
+            if ((binding.Modifiers & Keys.Shift) != Keys.None)
+                result += "Shift+";
+            if ((binding.Modifiers & Keys.Alt) != Keys.None)
+                result += "Alt+";
+
+            return result + binding.Key;
         }
 
         private static KeyBinding ReadTableToggleBinding()
