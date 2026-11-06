@@ -83,7 +83,7 @@ Además del visor F7, la build incorpora una primera mano de prueba para comprob
 
 Esta etapa todavía no incluye los cantos de truco/retruco/vale cuatro, el desarrollo interactivo del envido, el tanteador de una partida a 15/30, flor, ni una IA estratégica. El helper `TrucoRules.EnvidoPoints` sigue disponible para la futura implementación del envido, pero todavía no se puede cantar desde el juego. En este prototipo el jugador comienza como mano en cada reparto; la alternancia de mano se agregará con el tanteador.
 
-El visor de texturas F7 y la mesa Ctrl+F9 son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y Insert sirve para probar una mano real con las cartas cargadas desde el YTD. La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
+El visor de texturas F7 y la mesa Ctrl+F9 son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y Ctrl+F9 sirve para probar una mano real con las cartas cargadas desde el YTD. Se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts). La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
 
 ## Nota sobre validación
 
