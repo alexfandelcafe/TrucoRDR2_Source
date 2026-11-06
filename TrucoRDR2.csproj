@@ -19,7 +19,7 @@
     <Optimize>true</Optimize>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <RDR2Dir Condition="'$(RDR2Dir)' == ''">C:\Program Files\Rockstar Games\Red Dead Redemption 2</RDR2Dir>
+    <RDR2Dir Condition="'$(RDR2Dir)' == ''">D:\Red Dead Redemption 2</RDR2Dir>
     <ScriptHookRDRNetAPIDll Condition="'$(ScriptHookRDRNetAPIDll)' == ''">$(RDR2Dir)\ScriptHookRDRNetAPI.dll</ScriptHookRDRNetAPIDll>
   </PropertyGroup>
 
