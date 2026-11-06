@@ -28,8 +28,6 @@ namespace TrucoRDR2
             }
         }
 
-        private const float DesignWidth = 1920.0f;
-        private const float DesignHeight = 1080.0f;
         private const string DefaultTextureDictionary = "trucor2_cards";
         private const Keys TogglePreviewKey = Keys.F7;
         private const int CardsShown = 3;
