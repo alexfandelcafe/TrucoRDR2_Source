@@ -678,8 +678,14 @@ namespace TrucoRDR2
 
             if (round.HasPendingResponse && round.PendingResponder == TrucoPlayer.Player)
             {
+                bool isTrucoOffer = round.PendingCall == TrucoCall.Truco ||
+                                    round.PendingCall == TrucoCall.Retruco ||
+                                    round.PendingCall == TrucoCall.ValeCuatro;
+                string offerValue = isTrucoOffer
+                    ? "por " + (round.PendingValue + 1) + " puntos (no querido: " + round.PendingValue + ")"
+                    : round.PendingValue + " punto(s)";
                 string response = "RIVAL CANTA " + TrucoRound.CallName(round.PendingCall) +
-                                  " (" + round.PendingValue + "). Q=QUIERO / N=NO QUIERO";
+                                  " (" + offerValue + "). Q=QUIERO / N=NO QUIERO";
                 if (round.PendingCall == TrucoCall.Envido)
                     response += " / E, R o F para subir";
                 else if (round.PendingCall == TrucoCall.RealEnvido)
