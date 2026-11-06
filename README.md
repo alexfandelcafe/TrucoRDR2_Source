@@ -31,6 +31,8 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
 3. Las cartas deben tener estos nombres de textura, sin `.png`: `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. El catálogo usa rangos `01`–`07` y `10`–`12` y omite 8 y 9, que no se usan en el truco argentino.
 
+   Si generaste el YTD con RDR2 Texture ToolKit, usá el archivo de salida que termina en `_nya.ytd`; renombrá esa variante a `trucor2_cards.ytd`. El ToolKit también puede generar otro `.ytd` auxiliar que no es el destinado a RDR2.
+
 ## Compilar en Visual Studio 2022
 
 1. Abrí `TrucoRDR2.csproj`.
