@@ -474,34 +474,44 @@ namespace TrucoRDR2
         {
             get
             {
-                float width = RDR2.UI.Screen.Width;
-                float height = RDR2.UI.Screen.Height;
-                if (width <= 0.0f || height <= 0.0f)
+                Size resolution = RDR2.UI.Screen.Resolution;
+                if (resolution.Width <= 0 || resolution.Height <= 0)
                     return 1.0f;
 
-                return Math.Min(width / DesignWidth, height / DesignHeight);
+                return Math.Min(
+                    resolution.Width / RDR2.UI.Screen.Width,
+                    resolution.Height / RDR2.UI.Screen.Height);
             }
         }
 
         private static PointF LayoutPoint(float x, float y)
         {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return new PointF(x, y);
+
             float scale = LayoutScale;
-            float width = RDR2.UI.Screen.Width;
-            float height = RDR2.UI.Screen.Height;
-            float offsetX = (width - DesignWidth * scale) / 2.0f;
-            float offsetY = (height - DesignHeight * scale) / 2.0f;
-            return new PointF(offsetX + x * scale, offsetY + y * scale);
+            float offsetX = (resolution.Width - RDR2.UI.Screen.Width * scale) / 2.0f;
+            float offsetY = (resolution.Height - RDR2.UI.Screen.Height * scale) / 2.0f;
+            return new PointF(
+                (offsetX + x * scale) * RDR2.UI.Screen.Width / resolution.Width,
+                (offsetY + y * scale) * RDR2.UI.Screen.Height / resolution.Height);
         }
 
         private static SizeF LayoutSize(float width, float height)
         {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return new SizeF(width, height);
+
             float scale = LayoutScale;
-            return new SizeF(width * scale, height * scale);
+            return new SizeF(
+                width * scale * RDR2.UI.Screen.Width / resolution.Width,
+                height * scale * RDR2.UI.Screen.Height / resolution.Height);
         }
 
         private static float LayoutTextScale(float value)
         {
-            // The RDR2 text scale is already resolution-relative; only coordinates and sprites scale.
             return value;
         }
 
