@@ -67,7 +67,7 @@ namespace TrucoRDR2
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
-                "" + _tableToggleText + ": cerrar mesa    FLECHAS: elegir carta    ENTER: jugar    ESC: cerrar",
+                _tableToggleText + ": cerrar mesa    FLECHAS: elegir carta    ENTER: jugar    ESC: cerrar",
                 new PointF(960.0f, 125.0f), 0.40f, Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
