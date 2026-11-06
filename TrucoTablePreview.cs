@@ -631,7 +631,8 @@ namespace TrucoRDR2
 
             for (int i = 0; i < _handSprites.Length; i++)
             {
-                if (i == _selectedCardIndex && _match.Round.CurrentPlayer == TrucoPlayer.Player &&
+                if (i == _selectedCardIndex && !_dealAnimationActive &&
+                    _match.Round.CurrentPlayer == TrucoPlayer.Player &&
                     !_match.Round.IsComplete && !_match.Round.HasPendingResponse)
                     DrawSelectedCardFrame(i);
 
@@ -855,7 +856,7 @@ namespace TrucoRDR2
 
             int cardIndex = ChooseComputerCard(round, cards);
             TrucoCard playedCard = cards[cardIndex];
-            PointF from = LayoutPoint(905.0f, 205.0f);
+            PointF from = _opponentCardBackPositions[Math.Min(cardIndex, _opponentCardBackPositions.Length - 1)];
             round.PlayCard(TrucoPlayer.Opponent, cardIndex);
             StartPlayedCardAnimation(TrucoPlayer.Opponent, playedCard, from);
             RefreshSprites();
@@ -1036,8 +1037,8 @@ namespace TrucoRDR2
                 TextureName = card.TextureName,
                 From = from,
                 To = to,
-                FromWidth = LayoutLength(isPlayer ? HandCardWidth : 78.0f),
-                FromHeight = LayoutLength(isPlayer ? HandCardHeight : 117.0f),
+                FromWidth = LayoutLength(isPlayer ? HandCardWidth : OpponentBackWidth),
+                FromHeight = LayoutLength(isPlayer ? HandCardHeight : OpponentBackHeight),
                 ToWidth = LayoutLength(PlayedCardWidth),
                 ToHeight = LayoutLength(PlayedCardHeight),
                 StartedUtc = DateTime.UtcNow,
