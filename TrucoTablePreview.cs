@@ -91,7 +91,7 @@ namespace TrucoRDR2
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
-                "E ENVIDO | R REAL | F FALTA | T TRUCO | Q QUIERO | N NO QUIERO | FLECHAS + ENTER JUGAR",
+                "E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO | Q QUIERO | N NO QUIERO | FLECHAS + ENTER",
                 new PointF(960.0f, 112.0f), 0.34f, Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
@@ -318,9 +318,17 @@ namespace TrucoRDR2
                 TryCallEnvido(TrucoCall.FaltaEnvido);
             else if (e.KeyCode == Keys.T)
                 TryCallTruco();
+            else if (e.KeyCode == Keys.M)
+            {
+                if (_match.Round.Fold(TrucoPlayer.Player))
+                {
+                    TrucoAudio.Play(_soundEnabled, TrucoSound.Win);
+                    RefreshSprites();
+                }
+            }
 
             if (e.KeyCode == Keys.E || e.KeyCode == Keys.R ||
-                e.KeyCode == Keys.F || e.KeyCode == Keys.T)
+                e.KeyCode == Keys.F || e.KeyCode == Keys.T || e.KeyCode == Keys.M)
                 e.Handled = true;
         }
 
@@ -386,7 +394,10 @@ namespace TrucoRDR2
             if (e.KeyCode == Keys.Q)
             {
                 if (round.RespondPending(TrucoPlayer.Player, true))
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                {
+                    bool finished = _match.IsComplete || round.IsComplete;
+                    TrucoAudio.Play(_soundEnabled, finished ? TrucoSound.Win : TrucoSound.Accept);
+                }
                 e.Handled = true;
                 return;
             }
@@ -394,7 +405,10 @@ namespace TrucoRDR2
             if (e.KeyCode == Keys.N)
             {
                 if (round.RespondPending(TrucoPlayer.Player, false))
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Reject);
+                {
+                    bool finished = _match.IsComplete || round.IsComplete;
+                    TrucoAudio.Play(_soundEnabled, finished ? TrucoSound.Win : TrucoSound.Reject);
+                }
                 e.Handled = true;
                 return;
             }
@@ -560,11 +574,21 @@ namespace TrucoRDR2
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
 
             int envido = round.EnvidoFor(TrucoPlayer.Opponent);
-            if (round.CanCallEnvido(TrucoPlayer.Opponent) && envido >= 29)
+            if (round.CanCallEnvido(TrucoPlayer.Opponent))
             {
-                round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.Envido);
-                TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                return;
+                TrucoCall? envidoCall = null;
+                if (envido >= 32 && Math.Max(_match.PlayerScore, _match.OpponentScore) >= _match.TargetPoints - 5)
+                    envidoCall = TrucoCall.FaltaEnvido;
+                else if (envido >= 32)
+                    envidoCall = TrucoCall.RealEnvido;
+                else if (envido >= 29)
+                    envidoCall = TrucoCall.Envido;
+
+                if (envidoCall.HasValue && round.CallEnvido(TrucoPlayer.Opponent, envidoCall.Value))
+                {
+                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                    return;
+                }
             }
 
             int strength = round.HandStrength(TrucoPlayer.Opponent);
@@ -572,6 +596,15 @@ namespace TrucoRDR2
             {
                 round.CallTruco(TrucoPlayer.Opponent);
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                return;
+            }
+
+            // With a very weak hand facing an accepted raise, the computer may concede
+            // instead of playing out a hand that is unlikely to recover.
+            if (round.TrucoStake >= 2 && strength <= 12 && _random.NextDouble() < 0.30)
+            {
+                if (round.Fold(TrucoPlayer.Opponent))
+                    TrucoAudio.Play(_soundEnabled, TrucoSound.Win);
                 return;
             }
 
@@ -589,10 +622,27 @@ namespace TrucoRDR2
             {
                 int points = round.EnvidoFor(TrucoPlayer.Opponent);
 
+                if (pending == TrucoCall.Envido && points >= 26 && _random.NextDouble() < 0.20 &&
+                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.Envido))
+                {
+                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.Envido);
+                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                    return;
+                }
+
                 if (pending == TrucoCall.Envido && points >= 31 &&
                     round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.RealEnvido))
                 {
                     round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.RealEnvido);
+                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                    return;
+                }
+
+                if ((pending == TrucoCall.Envido || pending == TrucoCall.RealEnvido) && points >= 32 &&
+                    Math.Max(_match.PlayerScore, _match.OpponentScore) >= _match.TargetPoints - 5 &&
+                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido))
+                {
+                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido);
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                     return;
                 }
@@ -647,7 +697,11 @@ namespace TrucoRDR2
                 }
 
                 int strength = round.HandStrength(TrucoPlayer.Opponent);
-                int threshold = round.PendingValue >= 2 ? 25 : 21;
+                int threshold = pending == TrucoCall.Truco ? 21 :
+                                pending == TrucoCall.Retruco ? 29 : 36;
+                if (_match.OpponentScore >= _match.TargetPoints - 3)
+                    threshold += 2;
+
                 if ((pending == TrucoCall.Truco || pending == TrucoCall.Retruco) &&
                     strength >= 34 && round.RaiseTruco(TrucoPlayer.Opponent))
                 {
@@ -659,7 +713,10 @@ namespace TrucoRDR2
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
 
-            TrucoAudio.Play(_soundEnabled, accepted ? TrucoSound.Accept : TrucoSound.Reject);
+            if (_match.IsComplete || round.IsComplete)
+                TrucoAudio.Play(_soundEnabled, TrucoSound.Win);
+            else
+                TrucoAudio.Play(_soundEnabled, accepted ? TrucoSound.Accept : TrucoSound.Reject);
         }
 
         private void PlayPlayerCard()
@@ -675,7 +732,8 @@ namespace TrucoRDR2
                 _selectedCardIndex = Math.Min(_selectedCardIndex, Math.Max(0, round.PlayerCards.Count - 1));
                 _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
                 RefreshSprites();
-                TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
+                TrucoAudio.Play(_soundEnabled,
+                    (_match.IsComplete || round.IsComplete) ? TrucoSound.Win : TrucoSound.Select);
             }
             catch (Exception ex)
             {
@@ -692,7 +750,8 @@ namespace TrucoRDR2
             int cardIndex = ChooseComputerCard(round, cards);
             round.PlayCard(TrucoPlayer.Opponent, cardIndex);
             RefreshSprites();
-            TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
+            TrucoAudio.Play(_soundEnabled,
+                (_match.IsComplete || round.IsComplete) ? TrucoSound.Win : TrucoSound.Select);
         }
 
         private int ChooseComputerCard(TrucoRound round, IList<TrucoCard> cards)
@@ -850,10 +909,33 @@ namespace TrucoRDR2
                 if (cards != null && i < cards.Count)
                 {
                     string prefix = i == _selectedCardIndex ? "> " : "  ";
-                    caption = prefix + (i + 1) + ". " + cards[i].TextureName;
+                    caption = prefix + (i + 1) + ". " + FormatCardName(cards[i]);
                 }
                 SetCaption(_handLabels[i], caption);
             }
+        }
+
+        private static string FormatCardName(TrucoCard card)
+        {
+            if (card == null) return string.Empty;
+
+            string rank;
+            switch (card.Rank)
+            {
+                case 1: rank = "As"; break;
+                case 2: rank = "Dos"; break;
+                case 3: rank = "Tres"; break;
+                case 4: rank = "Cuatro"; break;
+                case 5: rank = "Cinco"; break;
+                case 6: rank = "Seis"; break;
+                case 7: rank = "Siete"; break;
+                case 10: rank = "Sota"; break;
+                case 11: rank = "Caballo"; break;
+                case 12: rank = "Rey"; break;
+                default: rank = card.Rank.ToString(); break;
+            }
+
+            return rank + " de " + card.Suit.ToString().ToLowerInvariant();
         }
 
         private void DrawTextOnly()
