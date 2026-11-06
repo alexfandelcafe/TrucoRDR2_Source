@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <ProjectGuid>{5D4AA5AE-BFF9-4C7E-A435-4BBF1ED09AE3}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>TrucoRDR2</RootNamespace>
+    <AssemblyName>TrucoRDR2</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <RDR2Dir Condition="'$(RDR2Dir)' == ''">C:\Program Files\Rockstar Games\Red Dead Redemption 2</RDR2Dir>
+    <ScriptHookRDRNetAPIDll Condition="'$(ScriptHookRDRNetAPIDll)' == ''">$(RDR2Dir)\ScriptHookRDRNetAPI.dll</ScriptHookRDRNetAPIDll>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <Optimize>false</Optimize>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="ScriptHookRDRNetAPI">
+      <HintPath>$(ScriptHookRDRNetAPIDll)</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="TrucoScript.cs" />
+    <Compile Include="CardTextureCatalog.cs" />
+    <Compile Include="TrucoCard.cs" />
+    <Compile Include="TrucoRules.cs" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <Target Name="ValidateScriptHookRDRNetAPI" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ScriptHookRDRNetAPIDll)')"
+           Text="No se encontró ScriptHookRDRNetAPI.dll en '$(ScriptHookRDRNetAPIDll)'. Cambia RDR2Dir o compila con /p:ScriptHookRDRNetAPIDll=&quot;RUTA\ScriptHookRDRNetAPI.dll&quot;. Usa la DLL de la misma versión de ScriptHookRDR2DotNet que está instalada en el juego." />
+  </Target>
+</Project>
