@@ -68,6 +68,21 @@ Si el estado muestra «El juego no encuentra…», abrí `scripts\TrucoRDR2.log`
 
 Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que las texturas internas se llamen exactamente `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. y revisá la tabla de nombres de la herramienta antes de generar el YTD.
 
+## Primera mano interactiva (prototipo)
+
+Además del visor F7, la build incorpora una primera mano de prueba para comprobar el flujo básico de juego:
+
+- `F8`: abrir o cerrar la mesa de prueba. Si la mano terminó, cerrá y volvé a abrir con F8 para repartir otra.
+- Flechas izquierda/derecha: seleccionar una de tus cartas.
+- `Enter`: jugar la carta seleccionada.
+- `Esc`: cerrar la mesa de prueba.
+- El rival recibe tres cartas que permanecen ocultas y juega una carta legal al azar cuando le toca.
+- La pantalla muestra las bazas resueltas, las pardas y quién ganó la mano.
+
+Esta etapa todavía no incluye los cantos de truco/retruco/vale cuatro, el desarrollo interactivo del envido, el tanteador de una partida a 15/30, flor, ni una IA estratégica. El helper `TrucoRules.EnvidoPoints` sigue disponible para la futura implementación del envido, pero todavía no se puede cantar desde el juego. En este prototipo el jugador comienza como mano en cada reparto; la alternancia de mano se agregará con el tanteador.
+
+El visor de texturas F7 y la mesa F8 son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y F8 sirve para probar una mano real con las cartas cargadas desde el YTD. La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
+
 ## Nota sobre validación
 
 El código está preparado para compilar contra la API V2.2.0, pero en este entorno no está instalado MSBuild/Visual Studio ni el runtime del juego, así que no puedo certificar una compilación ni probar la carga real del YTD aquí. El proyecto reporta un error de compilación explícito si no encuentra la DLL de API requerida.
