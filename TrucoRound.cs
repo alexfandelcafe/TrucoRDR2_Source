@@ -193,7 +193,9 @@ namespace TrucoRDR2
 
             if (HasPendingResponse)
                 return IsTrucoCall(PendingCall) && player == PendingResponder;
-            return player == CurrentPlayer;
+
+            // Either player may sing envido before the first card is played.
+            return true;
         }
 
         public bool CanRaiseEnvido(TrucoPlayer player, TrucoCall call)
