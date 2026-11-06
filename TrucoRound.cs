@@ -215,7 +215,7 @@ namespace TrucoRDR2
 
             if (HasPendingResponse)
             {
-                if (IsTrucoCall(PendingCall) && CardsPlayed == 0 && player == PendingResponder)
+                if (IsTrucoCall(PendingCall) && CardsPlayed == 0 && player == PendingResponder && CanCallEnvido(player))
                 {
                     SuspendPendingTruco();
                     _envidoBasePoints = 0;
