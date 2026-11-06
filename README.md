@@ -16,11 +16,13 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
 ## Configurar el YTD
 
-1. Para una instalación manual sin manifiesto, creá `lml\stream` si no existe y colocá el archivo directamente ahí:
+1. La herramienta Folders to YTD de fivemad genera un ZIP de recurso RedM. Extraé el ZIP y copiá solamente el archivo `.ytd` que está dentro de `stream`; para LML no necesitás `fxmanifest.lua` ni el README del recurso.
+
+   Para esta build, el nombre debe ser `trucor2_cards.ytd` y la ruta manual es:
 
    `D:\Red Dead Redemption 2\lml\stream\trucor2_cards.ytd`
 
-   No lo dejes en `lml\TrucoRDR2\stream` salvo que esa carpeta de mod tenga un `install.xml` válido que registre el contenido. LML usa `lml\stream` como carpeta de streaming manual.
+   Creá `lml\stream` si no existe. No lo dejes en `lml\TrucoRDR2\stream` salvo que esa carpeta tenga un `install.xml` válido que registre el contenido.
 
 2. Abrí `scripts/TrucoRDR2.ini` y confirmá que la sección contiene:
 
@@ -53,12 +55,12 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
 ## Probar dentro del juego
 
-- `F7`: mostrar u ocultar la vista de texturas. F6 queda libre porque abre el modo foto de RDR2.
+- `F7`: mostrar u ocultar la vista de texturas. F6 queda libre porque abre el modo foto de RDR2. La tecla se procesa una sola vez hasta que se suelta, para evitar alternancias por repetición de teclado.
 - `Av Pág` (`PageDown`): avanzar una carta en el catálogo.
 - `Re Pág` (`PageUp`): retroceder una carta.
 - `Esc`: cerrar la vista.
 
-Se muestran tres cartas de prueba con los nombres de textura encima. La línea de estado indica si el diccionario fue cargado por el juego.
+Los nombres de las tres texturas seleccionadas se muestran incluso cuando el YTD no está instalado o no se ha cargado. Las imágenes solo se dibujan cuando el juego confirma que el diccionario está cargado. La línea de estado permite separar problemas de registro del YTD de problemas con los nombres internos.
 
 Si el estado sigue en «Solicitando YTD», revisá que `vfs.asi` esté junto a `RDR2.exe`, que exista `lml\stream\\trucor2_cards.ytd` y buscá en el log de LML una entrada `adding` para ese YTD. Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que el YTD sea un diccionario válido para RDR2 y que sus texturas internas se llamen exactamente `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc.
 
