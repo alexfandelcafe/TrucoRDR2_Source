@@ -32,6 +32,7 @@ namespace TrucoRDR2
         private readonly TextElement _status;
 
         private bool _previewEnabled;
+        private bool _toggleKeyDown;
         private bool _textureRequestSent;
         private bool _spritesCreated;
         private int _firstCardIndex;
@@ -67,13 +68,14 @@ namespace TrucoRDR2
             for (int i = 0; i < CardsShown; i++)
             {
                 _cardLabels[i] = new TextElement(
-                    string.Empty,
+                    _textureNames[i],
                     new PointF(_cardPositions[i].X + CardWidth / 2.0f, 655.0f),
                     0.42f, Color.WhiteSmoke, Alignment.Center, true, true);
             }
 
             Tick += OnTick;
             KeyDown += OnKeyDown;
+            KeyUp += OnKeyUp;
             Aborted += OnAborted;
         }
 
@@ -81,7 +83,12 @@ namespace TrucoRDR2
         {
             if (e.KeyCode == TogglePreviewKey)
             {
-                SetPreviewEnabled(!_previewEnabled);
+                // Ignore repeated KeyDown events until the physical key is released.
+                if (!_toggleKeyDown)
+                {
+                    _toggleKeyDown = true;
+                    SetPreviewEnabled(!_previewEnabled);
+                }
                 e.Handled = true;
                 return;
             }
@@ -92,6 +99,7 @@ namespace TrucoRDR2
             if (e.KeyCode == Keys.PageDown)
             {
                 _firstCardIndex = (_firstCardIndex + 1) % _textureNames.Length;
+                UpdateVisibleCardLabels();
                 if (_spritesCreated)
                     RebuildVisibleSprites();
                 e.Handled = true;
@@ -99,6 +107,7 @@ namespace TrucoRDR2
             else if (e.KeyCode == Keys.PageUp)
             {
                 _firstCardIndex = (_firstCardIndex - 1 + _textureNames.Length) % _textureNames.Length;
+                UpdateVisibleCardLabels();
                 if (_spritesCreated)
                     RebuildVisibleSprites();
                 e.Handled = true;
@@ -106,6 +115,15 @@ namespace TrucoRDR2
             else if (e.KeyCode == Keys.Escape)
             {
                 SetPreviewEnabled(false);
+                e.Handled = true;
+            }
+        }
+
+        private void OnKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == TogglePreviewKey)
+            {
+                _toggleKeyDown = false;
                 e.Handled = true;
             }
         }
@@ -165,15 +183,13 @@ namespace TrucoRDR2
 
             _status.Draw();
 
-            if (_spritesCreated && dictionaryLoaded)
+            for (int i = 0; i < CardsShown; i++)
             {
-                for (int i = 0; i < CardsShown; i++)
-                {
-                    if (_sprites[i] != null)
-                        _sprites[i].Draw();
+                if (_spritesCreated && dictionaryLoaded && _sprites[i] != null)
+                    _sprites[i].Draw();
 
-                    _cardLabels[i].Draw();
-                }
+                // Keep texture names visible even when the YTD is missing or not loaded.
+                _cardLabels[i].Draw();
             }
         }
 
@@ -193,6 +209,7 @@ namespace TrucoRDR2
             if (_previewEnabled)
             {
                 _firstCardIndex = 0;
+                UpdateVisibleCardLabels();
                 _textureRequestSent = false;
                 _spritesCreated = false;
                 RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas activada. Av Pag/Re Pag cambia las cartas.");
@@ -231,6 +248,15 @@ namespace TrucoRDR2
 
                 _sprites[i] = replacements[i];
                 _cardLabels[i].Caption = visibleNames[i];
+            }
+        }
+
+        private void UpdateVisibleCardLabels()
+        {
+            for (int i = 0; i < CardsShown; i++)
+            {
+                int catalogIndex = (_firstCardIndex + i) % _textureNames.Length;
+                _cardLabels[i].Caption = _textureNames[catalogIndex];
             }
         }
 
