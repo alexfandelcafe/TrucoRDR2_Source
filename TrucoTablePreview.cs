@@ -232,7 +232,7 @@ namespace TrucoRDR2
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
-            TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
+            TrucoAudio.Play(_soundEnabled, _match.IsComplete ? TrucoSound.Win : TrucoSound.Deal);
         }
 
         public void Close()
@@ -463,6 +463,16 @@ namespace TrucoRDR2
             if (!_visible)
                 return;
 
+            try
+            {
+                // Keep normal gameplay controls disabled for both the in-game menu and the table.
+                PAD.DISABLE_ALL_CONTROL_ACTIONS(0);
+            }
+            catch
+            {
+                // Input suppression is best-effort and must not stop the table from rendering.
+            }
+
             if (_showMenu)
             {
                 _header.Draw();
@@ -473,16 +483,6 @@ namespace TrucoRDR2
 
             if (_match == null)
                 return;
-
-            try
-            {
-                // The overlay owns the keyboard while open; prevent movement, combat and gameplay actions.
-                PAD.DISABLE_ALL_CONTROL_ACTIONS(0);
-            }
-            catch
-            {
-                // Input suppression is best-effort and must not stop the table from rendering.
-            }
 
             _header.Draw();
             _instructions.Draw();
