@@ -1132,8 +1132,12 @@ namespace TrucoRDR2
 
         private static float LayoutTextScale(float value)
         {
-            // TextElement.Scale is a native text scale, not a pixel coordinate.
-            return value;
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return value;
+
+            // Text already scales with physical resolution; apply only the extra letterbox fit.
+            return value * LayoutScale * RDR2.UI.Screen.Height / resolution.Height;
         }
 
         private void DrawMenuSurface()
