@@ -449,6 +449,7 @@ namespace TrucoRDR2
                 if (round.RespondPending(TrucoPlayer.Player, true))
                 {
                     bool finished = _match.IsComplete || round.IsComplete;
+                    DelayComputerAction();
                     TrucoAudio.Play(_soundEnabled, finished ? TrucoSound.Win : TrucoSound.Accept);
                 }
                 e.Handled = true;
@@ -460,6 +461,7 @@ namespace TrucoRDR2
                 if (round.RespondPending(TrucoPlayer.Player, false))
                 {
                     bool finished = _match.IsComplete || round.IsComplete;
+                    DelayComputerAction();
                     TrucoAudio.Play(_soundEnabled, finished ? TrucoSound.Win : TrucoSound.Reject);
                 }
                 e.Handled = true;
@@ -475,17 +477,26 @@ namespace TrucoRDR2
             else if (e.KeyCode == Keys.T)
             {
                 if (round.RaiseTruco(TrucoPlayer.Player))
+                {
+                    DelayComputerAction();
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                }
             }
             else if (e.KeyCode == Keys.C)
             {
                 if (round.RaiseFlor(TrucoPlayer.Player, TrucoCall.ContraFlor))
+                {
+                    DelayComputerAction();
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                }
             }
             else if (e.KeyCode == Keys.B)
             {
                 if (round.RaiseFlor(TrucoPlayer.Player, TrucoCall.ContraFlorAlResto))
+                {
+                    DelayComputerAction();
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                }
             }
 
             if (e.KeyCode == Keys.E || e.KeyCode == Keys.R || e.KeyCode == Keys.F ||
@@ -496,19 +507,28 @@ namespace TrucoRDR2
         private void TryCallEnvido(TrucoCall call)
         {
             if (_match.Round.CallEnvido(TrucoPlayer.Player, call))
+            {
+                DelayComputerAction();
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+            }
         }
 
         private void TryRaiseEnvido(TrucoCall call)
         {
             if (_match.Round.CallEnvido(TrucoPlayer.Player, call))
+            {
+                DelayComputerAction();
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+            }
         }
 
         private void TryCallTruco()
         {
             if (_match.Round.CallTruco(TrucoPlayer.Player))
+            {
+                DelayComputerAction();
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+            }
         }
 
         public void Draw()
@@ -816,6 +836,11 @@ namespace TrucoRDR2
             {
                 SetCaption(_status, "No se pudo jugar la carta: " + ex.Message);
             }
+        }
+
+        private void DelayComputerAction()
+        {
+            _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
         }
 
         private void PlayComputerCard()
@@ -1172,9 +1197,14 @@ namespace TrucoRDR2
                 bool isTrucoOffer = round.PendingCall == TrucoCall.Truco ||
                                     round.PendingCall == TrucoCall.Retruco ||
                                     round.PendingCall == TrucoCall.ValeCuatro;
+                bool faltaCallsWholeMatch =
+                    (round.PendingCall == TrucoCall.FaltaEnvido ||
+                     round.PendingCall == TrucoCall.ContraFlorAlResto) &&
+                    (_match.TargetPoints == 15 ||
+                     (_match.PlayerScore < 15 && _match.OpponentScore < 15));
                 string offerValue = isTrucoOffer
                     ? "por " + (round.PendingValue + 1) + " puntos (no querido: " + round.PendingValue + ")"
-                    : round.PendingValue + " punto(s)";
+                    : (faltaCallsWholeMatch ? "por la partida" : round.PendingValue + " punto(s)");
                 string response = "RIVAL CANTA " + TrucoRound.CallName(round.PendingCall) +
                                   " (" + offerValue + "). Q=QUIERO / N=NO QUIERO";
                 if (round.PendingCall == TrucoCall.Envido)
