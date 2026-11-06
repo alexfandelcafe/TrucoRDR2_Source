@@ -500,6 +500,15 @@ namespace TrucoRDR2
             }
             else
             {
+                int envido = round.EnvidoFor(TrucoPlayer.Opponent);
+                if (round.CardsPlayed == 0 && round.CanCallEnvido(TrucoPlayer.Opponent) && envido >= 29)
+                {
+                    TrucoCall answer = envido >= 32 ? TrucoCall.RealEnvido : TrucoCall.Envido;
+                    round.CallEnvido(TrucoPlayer.Opponent, answer);
+                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                    return;
+                }
+
                 int strength = round.HandStrength(TrucoPlayer.Opponent);
                 int threshold = round.PendingValue >= 3 ? 25 : 21;
                 if (pending == TrucoCall.Truco && strength >= 34 && round.RaiseTruco(TrucoPlayer.Opponent))
@@ -631,8 +640,10 @@ namespace TrucoRDR2
             string third = round.Tricks.Count > 2 ? FormatTrick(round.Tricks[2]) : "-";
             SetCaption(_roundInfo,
                 "MANO: " + (round.Mano == TrucoPlayer.Player ? "VOS" : "RIVAL") +
+                "    |    RIVAL: " + round.OpponentCards.Count + " ocultas" +
                 "    |    BAZAS: " + first + " / " + second + " / " + third +
-                "    |    TRUCO: " + round.TrucoStake + " punto(s)");
+                "    |    TRUCO: " + round.TrucoStake + " punto(s)" +
+                "    |    FLOR: " + (_florEnabled ? "SI" : "NO"));
 
             string announcement = round.LastAnnouncement;
             if (!string.IsNullOrEmpty(_match.LastScoreEvent) &&
