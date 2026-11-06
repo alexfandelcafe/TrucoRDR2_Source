@@ -78,6 +78,12 @@ namespace TrucoRDR2
         private int _pendingTrucoLevel;
         private int _trucoLevel;
         private TrucoPlayer? _trucoRaisePlayer;
+        private bool _hasSuspendedTruco;
+        private TrucoCall _suspendedTrucoCall;
+        private TrucoPlayer _suspendedTrucoCaller;
+        private TrucoPlayer _suspendedTrucoResponder;
+        private int _suspendedTrucoLevel;
+        private int _suspendedTrucoValue;
 
         public event Action<TrucoPlayer, int, string> PointsAwarded;
 
@@ -180,10 +186,14 @@ namespace TrucoRDR2
 
         public bool CanCallEnvido(TrucoPlayer player)
         {
-            if (IsComplete || HasPendingResponse || player != CurrentPlayer) return false;
-            if (CardsPlayed != 0 || _envidoClosed || _envidoResolved || _trucoLevel != 0) return false;
-            if (FlorEnabled && (TrucoRules.HasFlor(_playerCards) || TrucoRules.HasFlor(_opponentCards))) return false;
-            return true;
+            if (IsComplete || CardsPlayed != 0 || _envidoClosed || _envidoResolved)
+                return false;
+            if (FlorEnabled && (TrucoRules.HasFlor(_playerCards) || TrucoRules.HasFlor(_opponentCards)))
+                return false;
+
+            if (HasPendingResponse)
+                return IsTrucoCall(PendingCall) && player == PendingResponder;
+            return player == CurrentPlayer;
         }
 
         public bool CanRaiseEnvido(TrucoPlayer player, TrucoCall call)
@@ -205,9 +215,18 @@ namespace TrucoRDR2
 
             if (HasPendingResponse)
             {
-                if (!CanRaiseEnvido(player, call)) return false;
-                _envidoBasePoints = _envidoTotal;
-                _envidoBaseWinner = PendingCaller.Value;
+                if (IsTrucoCall(PendingCall) && CardsPlayed == 0 && player == PendingResponder)
+                {
+                    SuspendPendingTruco();
+                    _envidoBasePoints = 0;
+                    _envidoBaseWinner = player;
+                }
+                else
+                {
+                    if (!CanRaiseEnvido(player, call)) return false;
+                    _envidoBasePoints = _envidoTotal;
+                    _envidoBaseWinner = PendingCaller.Value;
+                }
             }
             else
             {
@@ -391,6 +410,7 @@ namespace TrucoRDR2
             _envidoResolved = true;
             _envidoClosed = true;
             ClearPending();
+            RestoreSuspendedTruco();
             return true;
         }
 
@@ -529,6 +549,27 @@ namespace TrucoRDR2
             PendingResponder = null;
             PendingValue = 0;
             _pendingTrucoLevel = 0;
+        }
+
+        private void SuspendPendingTruco()
+        {
+            _hasSuspendedTruco = true;
+            _suspendedTrucoCall = PendingCall;
+            _suspendedTrucoCaller = PendingCaller.Value;
+            _suspendedTrucoResponder = PendingResponder.Value;
+            _suspendedTrucoLevel = _pendingTrucoLevel;
+            _suspendedTrucoValue = PendingValue;
+            ClearPending();
+        }
+
+        private void RestoreSuspendedTruco()
+        {
+            if (!_hasSuspendedTruco) return;
+
+            SetPending(_suspendedTrucoCall, _suspendedTrucoCaller,
+                _suspendedTrucoResponder, _suspendedTrucoValue);
+            _pendingTrucoLevel = _suspendedTrucoLevel;
+            _hasSuspendedTruco = false;
         }
 
         private static bool IsEnvidoCall(TrucoCall call)
