@@ -13,11 +13,15 @@ namespace TrucoRDR2
     /// </summary>
     internal sealed class TrucoTablePreview
     {
+        private const float DesignWidth = 1920.0f;
+        private const float DesignHeight = 1080.0f;
         private const float HandCardWidth = 160.0f;
         private const float HandCardHeight = 240.0f;
         private const float HandTop = 700.0f;
         private const float PlayedCardWidth = 108.0f;
         private const float PlayedCardHeight = 162.0f;
+        private const float OpponentBackWidth = 64.0f;
+        private const float OpponentBackHeight = 96.0f;
         private const double ComputerThinkSeconds = 0.65;
 
         private sealed class CardAnimation
@@ -43,18 +47,9 @@ namespace TrucoRDR2
         private int _menuSelection;
         private readonly Random _random = new Random();
 
-        private readonly PointF[] _handPositions =
-        {
-            new PointF(650.0f, HandTop),
-            new PointF(880.0f, HandTop),
-            new PointF(1110.0f, HandTop)
-        };
-        private readonly PointF[] _playedPositions =
-        {
-            new PointF(560.0f, 345.0f), new PointF(680.0f, 345.0f),
-            new PointF(830.0f, 345.0f), new PointF(950.0f, 345.0f),
-            new PointF(1100.0f, 345.0f), new PointF(1220.0f, 345.0f)
-        };
+        private readonly PointF[] _handPositions;
+        private readonly PointF[] _playedPositions;
+        private readonly PointF[] _opponentCardBackPositions;
 
         private readonly TextElement _header;
         private readonly TextElement _instructions;
@@ -102,57 +97,76 @@ namespace TrucoRDR2
             _florEnabled = florEnabled;
             _soundEnabled = soundEnabled;
 
+            _handPositions = new[]
+            {
+                LayoutPoint(650.0f, HandTop),
+                LayoutPoint(880.0f, HandTop),
+                LayoutPoint(1110.0f, HandTop)
+            };
+            _playedPositions = new[]
+            {
+                LayoutPoint(560.0f, 395.0f), LayoutPoint(680.0f, 395.0f),
+                LayoutPoint(830.0f, 395.0f), LayoutPoint(950.0f, 395.0f),
+                LayoutPoint(1100.0f, 395.0f), LayoutPoint(1220.0f, 395.0f)
+            };
+            _opponentCardBackPositions = new[]
+            {
+                LayoutPoint(740.0f, 275.0f),
+                LayoutPoint(928.0f, 275.0f),
+                LayoutPoint(1116.0f, 275.0f)
+            };
+
             _header = new TextElement(
                 "TRUCO RDR2",
-                new PointF(960.0f, 65.0f), 0.70f, Color.Wheat,
+                LayoutPoint(960.0f, 65.0f), LayoutTextScale(0.70f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
                 "E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO | Q QUIERO | N NO QUIERO | FLECHAS + ENTER",
-                new PointF(960.0f, 112.0f), 0.34f, Color.WhiteSmoke,
+                LayoutPoint(960.0f, 112.0f), LayoutTextScale(0.34f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _scoreboard = new TextElement(
                 string.Empty,
-                new PointF(960.0f, 165.0f), 0.55f, Color.White,
+                LayoutPoint(960.0f, 165.0f), LayoutTextScale(0.55f), Color.White,
                 Alignment.Center, true, true);
 
             _roundInfo = new TextElement(
                 string.Empty,
-                new PointF(960.0f, 210.0f), 0.39f, Color.WhiteSmoke,
+                LayoutPoint(960.0f, 210.0f), LayoutTextScale(0.39f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _announcement = new TextElement(
                 string.Empty,
-                new PointF(960.0f, 255.0f), 0.43f, Color.Wheat,
+                LayoutPoint(960.0f, 250.0f), LayoutTextScale(0.43f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _handTitle = new TextElement(
                 "TUS CARTAS",
-                new PointF(960.0f, 665.0f), 0.45f, Color.Wheat,
+                LayoutPoint(960.0f, 665.0f), LayoutTextScale(0.45f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _status = new TextElement(
                 "Preparando la mesa...",
-                new PointF(960.0f, 1025.0f), 0.39f, Color.WhiteSmoke,
+                LayoutPoint(960.0f, 1025.0f), LayoutTextScale(0.39f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _menuOptions = new TextElement(
                 string.Empty,
-                new PointF(960.0f, 470.0f), 0.60f, Color.WhiteSmoke,
+                LayoutPoint(960.0f, 470.0f), LayoutTextScale(0.60f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _menuHint = new TextElement(
                 string.Empty,
-                new PointF(960.0f, 650.0f), 0.38f, Color.Wheat,
+                LayoutPoint(960.0f, 650.0f), LayoutTextScale(0.38f), Color.Wheat,
                 Alignment.Center, true, true);
 
             for (int i = 0; i < 3; i++)
             {
                 _handLabels[i] = new TextElement(
                     string.Empty,
-                    new PointF(_handPositions[i].X + HandCardWidth / 2.0f, 670.0f),
-                    0.38f, Color.WhiteSmoke, Alignment.Center, true, true);
+                    LayoutPoint(650.0f + i * 230.0f + HandCardWidth / 2.0f, 670.0f),
+                    LayoutTextScale(0.38f), Color.WhiteSmoke, Alignment.Center, true, true);
             }
 
             for (int i = 0; i < 6; i++)
@@ -160,8 +174,8 @@ namespace TrucoRDR2
                 string owner = (i % 2 == 0) ? "VOS" : "RIVAL";
                 _playedLabels[i] = new TextElement(
                     owner,
-                    new PointF(_playedPositions[i].X + PlayedCardWidth / 2.0f, 318.0f),
-                    0.34f, Color.WhiteSmoke, Alignment.Center, true, true);
+                    LayoutPoint((i < 2 ? 560.0f : (i < 4 ? 830.0f : 1100.0f)) + (i % 2 == 0 ? 0.0f : 120.0f) + PlayedCardWidth / 2.0f, 368.0f),
+                    LayoutTextScale(0.34f), Color.WhiteSmoke, Alignment.Center, true, true);
             }
         }
 
@@ -572,6 +586,7 @@ namespace TrucoRDR2
             _scoreboard.Draw();
             _roundInfo.Draw();
             _announcement.Draw();
+            DrawOpponentCardBacks();
             _handTitle.Draw();
 
             for (int i = 0; i < _playedLabels.Length; i++)
@@ -808,7 +823,7 @@ namespace TrucoRDR2
 
             int cardIndex = ChooseComputerCard(round, cards);
             TrucoCard playedCard = cards[cardIndex];
-            PointF from = new PointF(905.0f, 205.0f);
+            PointF from = LayoutPoint(905.0f, 205.0f);
             round.PlayCard(TrucoPlayer.Opponent, cardIndex);
             StartPlayedCardAnimation(TrucoPlayer.Opponent, playedCard, from);
             RefreshSprites();
@@ -865,10 +880,10 @@ namespace TrucoRDR2
 
             float t = Ease((float)(elapsed / duration));
             PointF target = _handPositions[index];
-            PointF source = new PointF(905.0f, 365.0f);
+            PointF source = LayoutPoint(905.0f, 365.0f);
             PointF position = Lerp(source, target, t);
-            float width = Lerp(72.0f, HandCardWidth, t);
-            float height = Lerp(108.0f, HandCardHeight, t);
+            float width = Lerp(LayoutLength(72.0f), LayoutLength(HandCardWidth), t);
+            float height = Lerp(LayoutLength(108.0f), LayoutLength(HandCardHeight), t);
             DrawTransientSprite(
                 _match.Round.PlayerCards[index].TextureName,
                 new SizeF(width, height),
@@ -914,10 +929,10 @@ namespace TrucoRDR2
                 TextureName = card.TextureName,
                 From = from,
                 To = to,
-                FromWidth = isPlayer ? HandCardWidth : 78.0f,
-                FromHeight = isPlayer ? HandCardHeight : 117.0f,
-                ToWidth = PlayedCardWidth,
-                ToHeight = PlayedCardHeight,
+                FromWidth = LayoutLength(isPlayer ? HandCardWidth : 78.0f),
+                FromHeight = LayoutLength(isPlayer ? HandCardHeight : 117.0f),
+                ToWidth = LayoutLength(PlayedCardWidth),
+                ToHeight = LayoutLength(PlayedCardHeight),
                 StartedUtc = DateTime.UtcNow,
                 DurationSeconds = 0.28
             };
@@ -936,6 +951,86 @@ namespace TrucoRDR2
                 if (transient != null)
                     transient.Dispose();
             }
+        }
+
+        private static float LayoutScale
+        {
+            get
+            {
+                float width = RDR2.UI.Screen.Width;
+                float height = RDR2.UI.Screen.Height;
+                if (width <= 0.0f || height <= 0.0f)
+                    return 1.0f;
+
+                float scaleX = width / DesignWidth;
+                float scaleY = height / DesignHeight;
+                return Math.Min(scaleX, scaleY);
+            }
+        }
+
+        private static PointF LayoutPoint(float x, float y)
+        {
+            float scale = LayoutScale;
+            float width = RDR2.UI.Screen.Width;
+            float height = RDR2.UI.Screen.Height;
+            float offsetX = (width - DesignWidth * scale) / 2.0f;
+            float offsetY = (height - DesignHeight * scale) / 2.0f;
+            return new PointF(offsetX + x * scale, offsetY + y * scale);
+        }
+
+        private static SizeF LayoutSize(float width, float height)
+        {
+            float scale = LayoutScale;
+            return new SizeF(width * scale, height * scale);
+        }
+
+        private static float LayoutLength(float value)
+        {
+            return value * LayoutScale;
+        }
+
+        private static float LayoutTextScale(float value)
+        {
+            return value * LayoutScale;
+        }
+
+        private void DrawOpponentCardBacks()
+        {
+            if (_match == null || _match.Round == null || !_textureDictionaryLoaded)
+                return;
+
+            int count = Math.Min(3, _match.Round.OpponentCards.Count);
+            SizeF cardSize = LayoutSize(OpponentBackWidth, OpponentBackHeight);
+            for (int i = 0; i < count; i++)
+            {
+                PointF position = _opponentCardBackPositions[i];
+                float centerX = position.X + cardSize.Width / 2.0f;
+                float centerY = position.Y + cardSize.Height / 2.0f;
+
+                DrawRect(centerX, centerY, cardSize.Width, cardSize.Height, 22, 20, 26, 245);
+                DrawRect(centerX, centerY, cardSize.Width - LayoutLength(5.0f), cardSize.Height - LayoutLength(5.0f), 151, 104, 51, 255);
+                DrawRect(centerX, centerY, cardSize.Width - LayoutLength(10.0f), cardSize.Height - LayoutLength(10.0f), 42, 42, 74, 255);
+                DrawRect(centerX, centerY, LayoutLength(4.0f), cardSize.Height - LayoutLength(18.0f), 202, 170, 100, 255);
+                DrawRect(centerX, centerY, cardSize.Width - LayoutLength(18.0f), LayoutLength(4.0f), 202, 170, 100, 255);
+                DrawRect(centerX, centerY, LayoutLength(15.0f), LayoutLength(15.0f), 218, 193, 135, 255);
+                DrawRect(centerX, centerY, LayoutLength(9.0f), LayoutLength(9.0f), 42, 42, 74, 255);
+            }
+        }
+
+        private static void DrawRect(float centerX, float centerY, float width, float height,
+            int red, int green, int blue, int alpha)
+        {
+            float screenWidth = RDR2.UI.Screen.Width;
+            float screenHeight = RDR2.UI.Screen.Height;
+            if (screenWidth <= 0.0f || screenHeight <= 0.0f)
+                return;
+
+            GRAPHICS.DRAW_RECT(
+                centerX / screenWidth,
+                centerY / screenHeight,
+                width / screenWidth,
+                height / screenHeight,
+                red, green, blue, alpha, false, false);
         }
 
         private static float Ease(float t)
@@ -970,7 +1065,7 @@ namespace TrucoRDR2
             {
                 _handSprites[i] = new Sprite(
                     _textureDictionary, playerCards[i].TextureName,
-                    new SizeF(HandCardWidth, HandCardHeight), _handPositions[i]);
+                    LayoutSize(HandCardWidth, HandCardHeight), _handPositions[i]);
             }
 
             foreach (TrucoTrick trick in round.Tricks)
@@ -994,7 +1089,7 @@ namespace TrucoRDR2
             int slot = trickIndex * 2 + (player == TrucoPlayer.Player ? 0 : 1);
             _playedSprites[slot] = new Sprite(
                 _textureDictionary, card.TextureName,
-                new SizeF(PlayedCardWidth, PlayedCardHeight), _playedPositions[slot]);
+                LayoutSize(PlayedCardWidth, PlayedCardHeight), _playedPositions[slot]);
         }
 
         private void UpdateText()
@@ -1115,6 +1210,7 @@ namespace TrucoRDR2
             _scoreboard.Draw();
             _roundInfo.Draw();
             _announcement.Draw();
+            DrawOpponentCardBacks();
             _handTitle.Draw();
             _status.Draw();
         }
