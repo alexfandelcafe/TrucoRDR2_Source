@@ -111,9 +111,9 @@ namespace TrucoRDR2
             };
             _opponentCardBackPositions = new[]
             {
-                LayoutPoint(740.0f, 275.0f),
-                LayoutPoint(928.0f, 275.0f),
-                LayoutPoint(1116.0f, 275.0f)
+                LayoutPoint(740.0f, 285.0f),
+                LayoutPoint(928.0f, 285.0f),
+                LayoutPoint(1116.0f, 285.0f)
             };
 
             _header = new TextElement(
@@ -1020,7 +1020,7 @@ namespace TrucoRDR2
 
         private void DrawTableSurface()
         {
-            PointF center = LayoutPoint(960.0f, 480.0f);
+            PointF center = LayoutPoint(960.0f, 495.0f);
             SizeF outer = LayoutSize(840.0f, 225.0f);
             SizeF middle = LayoutSize(824.0f, 209.0f);
             SizeF inner = LayoutSize(806.0f, 191.0f);
