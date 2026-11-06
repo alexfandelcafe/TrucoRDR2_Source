@@ -379,6 +379,15 @@ namespace TrucoRDR2
 
             TrucoPlayer winner = OtherPlayer(player);
             int points = TrucoStake;
+            bool envidoStillAvailable = CardsPlayed == 0 &&
+                !_envidoResolved && !_envidoClosed &&
+                !(FlorEnabled && (TrucoRules.HasFlor(_playerCards) || TrucoRules.HasFlor(_opponentCards)));
+
+            // In the common Argentine ruleset, going to the deck before the first card
+            // also concedes the unopened envido. That makes the no-truco fold worth 2.
+            if (_trucoLevel == 0 && envidoStillAvailable)
+                points = 2;
+
             LastAnnouncement = PlayerName(player) + " se va al mazo. " +
                                PlayerName(winner) + " gana " + points + " punto(s).";
             Complete(winner, points, "Se fue al mazo");
@@ -425,9 +434,10 @@ namespace TrucoRDR2
                 TrucoPlayer winner = TrucoRules.CompareEnvido(_playerCards, _opponentCards, Mano);
                 int playerPoints = TrucoRules.EnvidoPoints(_playerCards);
                 int opponentPoints = TrucoRules.EnvidoPoints(_opponentCards);
-                Award(winner, _pendingValue, "Envido ganado (" + playerPoints + " a " + opponentPoints + ")");
+                int awardedPoints = _faltaEnvidoCalled ? CalculateFaltaPoints(winner) : _pendingValue;
+                Award(winner, awardedPoints, "Envido ganado (" + playerPoints + " a " + opponentPoints + ")");
                 LastAnnouncement = "Envido querido: " + playerPoints + " a " + opponentPoints +
-                                    ". Gana " + PlayerName(winner) + " (" + _pendingValue + " puntos).";
+                                    ". Gana " + PlayerName(winner) + " (" + awardedPoints + " puntos).";
             }
             else
             {
@@ -452,9 +462,12 @@ namespace TrucoRDR2
                 TrucoPlayer winner = TrucoRules.CompareFlor(_playerCards, _opponentCards, Mano);
                 int playerPoints = TrucoRules.FlorPoints(_playerCards);
                 int opponentPoints = TrucoRules.FlorPoints(_opponentCards);
-                Award(winner, _pendingValue, "Flor ganada (" + playerPoints + " a " + opponentPoints + ")");
+                int awardedPoints = _florCalls.Contains(TrucoCall.ContraFlorAlResto)
+                    ? CalculateFaltaPoints(winner)
+                    : _pendingValue;
+                Award(winner, awardedPoints, "Flor ganada (" + playerPoints + " a " + opponentPoints + ")");
                 LastAnnouncement = "Flor querida: " + playerPoints + " a " + opponentPoints +
-                                   ". Gana " + PlayerName(winner) + " (" + _pendingValue + " puntos).";
+                                   ". Gana " + PlayerName(winner) + " (" + awardedPoints + " puntos).";
             }
             else
             {
@@ -553,7 +566,30 @@ namespace TrucoRDR2
         private int CalculateFaltaPoints()
         {
             int leaderScore = Math.Max(_playerScoreAtStart, _opponentScoreAtStart);
+
+            // ASART-style Argentine rules: while both players are in malas, a wanted
+            // Falta Envido is for the whole match; after anyone reaches buenas, it is
+            // the points the current leader needs to reach the target.
+            if (_targetPoints == 15 ||
+                (_targetPoints == 30 && _playerScoreAtStart < 15 && _opponentScoreAtStart < 15))
+                return _targetPoints;
+
             return Math.Max(1, _targetPoints - leaderScore);
+        }
+
+        private int CalculateFaltaPoints(TrucoPlayer winner)
+        {
+            if (_targetPoints == 15 ||
+                (_targetPoints == 30 && _playerScoreAtStart < 15 && _opponentScoreAtStart < 15))
+                return Math.Max(1, _targetPoints - ScoreAtStart(winner));
+
+            int leaderScore = Math.Max(_playerScoreAtStart, _opponentScoreAtStart);
+            return Math.Max(1, _targetPoints - leaderScore);
+        }
+
+        private int ScoreAtStart(TrucoPlayer player)
+        {
+            return player == TrucoPlayer.Player ? _playerScoreAtStart : _opponentScoreAtStart;
         }
 
         private void SetTrucoOffer(TrucoPlayer player, int level)
