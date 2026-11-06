@@ -318,6 +318,16 @@ namespace TrucoRDR2
             if (!_visible || _match == null)
                 return;
 
+            try
+            {
+                // The overlay owns the keyboard while open; prevent movement, combat and gameplay actions.
+                PAD.DISABLE_ALL_CONTROL_ACTIONS(0);
+            }
+            catch
+            {
+                // Input suppression is best-effort and must not stop the table from rendering.
+            }
+
             AdvanceComputer();
             _header.Draw();
             _instructions.Draw();
