@@ -20,6 +20,20 @@ namespace TrucoRDR2
         private const float PlayedCardHeight = 162.0f;
         private const double ComputerThinkSeconds = 0.65;
 
+        private sealed class CardAnimation
+        {
+            public int Slot;
+            public string TextureName;
+            public PointF From;
+            public PointF To;
+            public float FromWidth;
+            public float FromHeight;
+            public float ToWidth;
+            public float ToHeight;
+            public DateTime StartedUtc;
+            public double DurationSeconds;
+        }
+
         private readonly string _textureDictionary;
         private readonly string _tableToggleText;
         private int _targetPoints;
@@ -64,6 +78,9 @@ namespace TrucoRDR2
         private int _selectedCardIndex;
         private DateTime _textureRequestTimeUtc;
         private DateTime _nextComputerActionUtc;
+        private DateTime _dealAnimationStartUtc;
+        private bool _dealAnimationActive;
+        private CardAnimation _playedCardAnimation;
 
         public bool IsVisible { get { return _visible; } }
         public bool IsRoundComplete
@@ -168,6 +185,8 @@ namespace TrucoRDR2
             _textureDictionaryLoaded = false;
             _textureRequestTimeUtc = DateTime.UtcNow;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
+            _dealAnimationActive = false;
+            _playedCardAnimation = null;
             _spritesCreated = false;
             UpdateHandLabels();
         }
@@ -181,6 +200,9 @@ namespace TrucoRDR2
             _textureDictionaryLoaded = false;
             _textureRequestTimeUtc = DateTime.UtcNow;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
+            _dealAnimationStartUtc = DateTime.UtcNow;
+            _dealAnimationActive = true;
+            _playedCardAnimation = null;
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
@@ -229,6 +251,9 @@ namespace TrucoRDR2
             _match.StartNextRound();
             _selectedCardIndex = 0;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
+            _dealAnimationStartUtc = DateTime.UtcNow;
+            _dealAnimationActive = !_match.IsComplete;
+            _playedCardAnimation = null;
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
@@ -238,6 +263,8 @@ namespace TrucoRDR2
         public void Close()
         {
             _visible = false;
+            _dealAnimationActive = false;
+            _playedCardAnimation = null;
             DisposeSprites();
             // Keep the match, score and current hand so reopening the table resumes play.
             _textureRequestSent = false;
@@ -267,6 +294,18 @@ namespace TrucoRDR2
                 Close();
                 e.Handled = true;
                 return;
+            }
+
+            if (_dealAnimationActive)
+            {
+                if (DateTime.UtcNow < _dealAnimationStartUtc.AddMilliseconds(650) &&
+                    e.KeyCode != Keys.Escape)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                _dealAnimationActive = false;
             }
 
             if (_match.IsComplete || _match.Round.IsComplete)
@@ -539,12 +578,29 @@ namespace TrucoRDR2
                 _playedLabels[i].Draw();
 
             for (int i = 0; i < _playedSprites.Length; i++)
-                if (_playedSprites[i] != null) _playedSprites[i].Draw();
+            {
+                if (_playedCardAnimation != null && _playedCardAnimation.Slot == i)
+                {
+                    if (DrawPlayedCardAnimation())
+                        continue;
+
+                    _playedCardAnimation = null;
+                }
+
+                if (_playedSprites[i] != null)
+                    _playedSprites[i].Draw();
+            }
 
             for (int i = 0; i < _handSprites.Length; i++)
             {
-                if (_handSprites[i] != null) _handSprites[i].Draw();
-                _handLabels[i].Draw();
+                if (_handSprites[i] != null)
+                {
+                    if (!DrawDealingCard(i))
+                        _handSprites[i].Draw();
+                }
+
+                if (!_dealAnimationActive || DateTime.UtcNow >= _dealAnimationStartUtc.AddMilliseconds(650))
+                    _handLabels[i].Draw();
             }
 
             _status.Draw();
@@ -728,7 +784,10 @@ namespace TrucoRDR2
 
             try
             {
+                TrucoCard playedCard = round.PlayerCards[_selectedCardIndex];
+                PointF from = _handPositions[_selectedCardIndex];
                 round.PlayCard(TrucoPlayer.Player, _selectedCardIndex);
+                StartPlayedCardAnimation(TrucoPlayer.Player, playedCard, from);
                 _selectedCardIndex = Math.Min(_selectedCardIndex, Math.Max(0, round.PlayerCards.Count - 1));
                 _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
                 RefreshSprites();
@@ -748,7 +807,10 @@ namespace TrucoRDR2
             if (cards.Count == 0) return;
 
             int cardIndex = ChooseComputerCard(round, cards);
+            TrucoCard playedCard = cards[cardIndex];
+            PointF from = new PointF(905.0f, 205.0f);
             round.PlayCard(TrucoPlayer.Opponent, cardIndex);
+            StartPlayedCardAnimation(TrucoPlayer.Opponent, playedCard, from);
             RefreshSprites();
             TrucoAudio.Play(_soundEnabled,
                 (_match.IsComplete || round.IsComplete) ? TrucoSound.Win : TrucoSound.Select);
@@ -780,6 +842,117 @@ namespace TrucoRDR2
 
             // If responding to a card, spend the weakest card that wins; otherwise shed the weakest.
             return winningIndex >= 0 ? winningIndex : weakestIndex;
+        }
+
+        private bool DrawDealingCard(int index)
+        {
+            if (!_dealAnimationActive || _match == null || index < 0 ||
+                index >= _match.Round.PlayerCards.Count)
+                return false;
+
+            DateTime now = DateTime.UtcNow;
+            double elapsed = (now - _dealAnimationStartUtc).TotalSeconds - index * 0.11;
+            const double duration = 0.32;
+            if (elapsed >= duration)
+            {
+                if (now >= _dealAnimationStartUtc.AddMilliseconds(650))
+                    _dealAnimationActive = false;
+                return false;
+            }
+
+            if (elapsed < 0)
+                return true;
+
+            float t = Ease((float)(elapsed / duration));
+            PointF target = _handPositions[index];
+            PointF source = new PointF(905.0f, 365.0f);
+            PointF position = Lerp(source, target, t);
+            float width = Lerp(72.0f, HandCardWidth, t);
+            float height = Lerp(108.0f, HandCardHeight, t);
+            DrawTransientSprite(
+                _match.Round.PlayerCards[index].TextureName,
+                new SizeF(width, height),
+                position);
+            return true;
+        }
+
+        private bool DrawPlayedCardAnimation()
+        {
+            CardAnimation animation = _playedCardAnimation;
+            if (animation == null)
+                return false;
+
+            double elapsed = (DateTime.UtcNow - animation.StartedUtc).TotalSeconds;
+            if (elapsed >= animation.DurationSeconds)
+                return false;
+
+            float t = Ease((float)(elapsed / animation.DurationSeconds));
+            PointF position = Lerp(animation.From, animation.To, t);
+            float width = Lerp(animation.FromWidth, animation.ToWidth, t);
+            float height = Lerp(animation.FromHeight, animation.ToHeight, t);
+            DrawTransientSprite(animation.TextureName, new SizeF(width, height), position);
+            return true;
+        }
+
+        private void StartPlayedCardAnimation(TrucoPlayer player, TrucoCard card, PointF from)
+        {
+            if (card == null || _match == null)
+                return;
+
+            TrucoRound round = _match.Round;
+            int cardCount = round.CardsPlayed;
+            int trickIndex = Math.Max(0, (cardCount - 1) / 2);
+            int slot = trickIndex * 2 + (player == TrucoPlayer.Player ? 0 : 1);
+            if (slot < 0 || slot >= _playedPositions.Length)
+                return;
+
+            PointF to = _playedPositions[slot];
+            bool isPlayer = player == TrucoPlayer.Player;
+            _playedCardAnimation = new CardAnimation
+            {
+                Slot = slot,
+                TextureName = card.TextureName,
+                From = from,
+                To = to,
+                FromWidth = isPlayer ? HandCardWidth : 78.0f,
+                FromHeight = isPlayer ? HandCardHeight : 117.0f,
+                ToWidth = PlayedCardWidth,
+                ToHeight = PlayedCardHeight,
+                StartedUtc = DateTime.UtcNow,
+                DurationSeconds = 0.28
+            };
+        }
+
+        private void DrawTransientSprite(string textureName, SizeF size, PointF position)
+        {
+            Sprite transient = null;
+            try
+            {
+                transient = new Sprite(_textureDictionary, textureName, size, position);
+                transient.Draw();
+            }
+            finally
+            {
+                if (transient != null)
+                    transient.Dispose();
+            }
+        }
+
+        private static float Ease(float t)
+        {
+            if (t < 0.0f) t = 0.0f;
+            if (t > 1.0f) t = 1.0f;
+            return t * t * (3.0f - 2.0f * t);
+        }
+
+        private static PointF Lerp(PointF from, PointF to, float t)
+        {
+            return new PointF(Lerp(from.X, to.X, t), Lerp(from.Y, to.Y, t));
+        }
+
+        private static float Lerp(float from, float to, float t)
+        {
+            return from + (to - from) * t;
         }
 
         private void RefreshSprites()
