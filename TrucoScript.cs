@@ -18,6 +18,7 @@ namespace TrucoRDR2
     {
         private const string DefaultTextureDictionary = "trucor2_cards";
         private const Keys TogglePreviewKey = Keys.F7;
+        private const Keys ToggleTableKey = Keys.F8;
         private const int CardsShown = 3;
         private const float CardWidth = 180.0f;
         private const float CardHeight = 270.0f;
@@ -32,10 +33,12 @@ namespace TrucoRDR2
         private readonly TextElement _header;
         private readonly TextElement _instructions;
         private readonly TextElement _status;
+        private readonly TrucoTablePreview _tablePreview;
         private readonly string _diagnosticLogPath;
 
         private bool _previewEnabled;
         private bool _toggleKeyDown;
+        private bool _tableToggleKeyDown;
         private bool _textureRequestSent;
         private bool _spritesCreated;
         private int _firstCardIndex;
@@ -47,6 +50,7 @@ namespace TrucoRDR2
             Interval = 0;
             _textureDictionary = ReadTextureDictionarySetting();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
+            _tablePreview = new TrucoTablePreview(_textureDictionary);
 
             string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(scriptDirectory))
@@ -95,8 +99,40 @@ namespace TrucoRDR2
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.KeyCode == ToggleTableKey)
+            {
+                // Ignore repeated KeyDown events until the physical key is released.
+                if (!_tableToggleKeyDown)
+                {
+                    _tableToggleKeyDown = true;
+                    if (_tablePreview.IsVisible)
+                    {
+                        _tablePreview.Close();
+                        WriteDiagnostic("Mesa de prueba cerrada.");
+                    }
+                    else
+                    {
+                        if (_previewEnabled)
+                            SetPreviewEnabled(false);
+
+                        _tablePreview.Start();
+                        WriteDiagnostic("Mesa de prueba activada.");
+                    }
+                }
+
+                e.Handled = true;
+                return;
+            }
+
             if (e.KeyCode == TogglePreviewKey)
             {
+                // The F7 texture viewer and the F8 table prototype are mutually exclusive.
+                if (_tablePreview.IsVisible)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
                 // Ignore repeated KeyDown events until the physical key is released.
                 if (!_toggleKeyDown)
                 {
@@ -104,6 +140,12 @@ namespace TrucoRDR2
                     SetPreviewEnabled(!_previewEnabled);
                 }
                 e.Handled = true;
+                return;
+            }
+
+            if (_tablePreview.IsVisible)
+            {
+                _tablePreview.HandleKeyDown(e);
                 return;
             }
 
@@ -135,6 +177,13 @@ namespace TrucoRDR2
 
         private void OnKeyUp(object sender, KeyEventArgs e)
         {
+            if (e.KeyCode == ToggleTableKey)
+            {
+                _tableToggleKeyDown = false;
+                e.Handled = true;
+                return;
+            }
+
             if (e.KeyCode == TogglePreviewKey)
             {
                 _toggleKeyDown = false;
@@ -144,6 +193,12 @@ namespace TrucoRDR2
 
         private void OnTick(object sender, EventArgs e)
         {
+            if (_tablePreview.IsVisible)
+            {
+                _tablePreview.Draw();
+                return;
+            }
+
             if (!_previewEnabled)
                 return;
 
@@ -333,6 +388,7 @@ namespace TrucoRDR2
 
         private void OnAborted(object sender, EventArgs e)
         {
+            _tablePreview.Close();
             _previewEnabled = false;
             DisposeSprites();
             WriteDiagnostic("Script abortado; sprites liberados.");
