@@ -55,6 +55,7 @@
     <Compile Include="TrucoRules.cs" />
     <Compile Include="TrucoDeck.cs" />
     <Compile Include="TrucoRound.cs" />
+    <Compile Include="TrucoTablePreview.cs" />
   </ItemGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
