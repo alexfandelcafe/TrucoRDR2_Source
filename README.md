@@ -31,6 +31,8 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
    TextureDictionary=trucor2_cards
    ```
 
+   La combinación para abrir la mesa se configura en la sección `[Controls]` del mismo archivo INI; el valor predeterminado es `Control+F9`.
+
 3. Las cartas deben tener estos nombres de textura, sin `.png`: `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. El catálogo usa rangos `01`–`07` y `10`–`12` y omite 8 y 9, que no se usan en el truco argentino.
 
    Si generaste el YTD con RDR2 Texture ToolKit, usá el archivo de salida que termina en `_nya.ytd`; renombrá esa variante a `trucor2_cards.ytd`. El ToolKit también puede generar otro `.ytd` auxiliar que no es el destinado a RDR2.
@@ -72,7 +74,7 @@ Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que la
 
 Además del visor F7, la build incorpora una primera mano de prueba para comprobar el flujo básico de juego:
 
-- `Insert`: abrir o cerrar la mesa; cuando una mano termina, Insert reparte otra mano directamente.
+- `Ctrl+F9` (configurable): abrir o cerrar la mesa; cuando una mano termina, la misma combinación reparte otra mano.
 - Flechas izquierda/derecha: seleccionar una de tus cartas.
 - `Enter`: jugar la carta seleccionada.
 - `Esc`: cerrar la mesa de prueba.
@@ -81,7 +83,7 @@ Además del visor F7, la build incorpora una primera mano de prueba para comprob
 
 Esta etapa todavía no incluye los cantos de truco/retruco/vale cuatro, el desarrollo interactivo del envido, el tanteador de una partida a 15/30, flor, ni una IA estratégica. El helper `TrucoRules.EnvidoPoints` sigue disponible para la futura implementación del envido, pero todavía no se puede cantar desde el juego. En este prototipo el jugador comienza como mano en cada reparto; la alternancia de mano se agregará con el tanteador.
 
-El visor de texturas F7 y la mesa Insert son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y Insert sirve para probar una mano real con las cartas cargadas desde el YTD. La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
+El visor de texturas F7 y la mesa Ctrl+F9 son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y Insert sirve para probar una mano real con las cartas cargadas desde el YTD. La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
 
 ## Nota sobre validación
 
