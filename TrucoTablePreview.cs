@@ -63,6 +63,7 @@ namespace TrucoRDR2
         private readonly TextElement[] _handLabels = new TextElement[3];
         private readonly TextElement[] _playedLabels = new TextElement[6];
         private readonly Sprite[] _handSprites = new Sprite[3];
+        private readonly Sprite[] _opponentRevealSprites = new Sprite[3];
         private readonly Sprite[] _playedSprites = new Sprite[6];
 
         private TrucoMatch _match;
@@ -450,6 +451,7 @@ namespace TrucoRDR2
                 {
                     bool finished = _match.IsComplete || round.IsComplete;
                     DelayComputerAction();
+                    RefreshSprites();
                     TrucoAudio.Play(_soundEnabled, finished ? TrucoSound.Win : TrucoSound.Accept);
                 }
                 e.Handled = true;
@@ -462,6 +464,7 @@ namespace TrucoRDR2
                 {
                     bool finished = _match.IsComplete || round.IsComplete;
                     DelayComputerAction();
+                    RefreshSprites();
                     TrucoAudio.Play(_soundEnabled, finished ? TrucoSound.Win : TrucoSound.Reject);
                 }
                 e.Handled = true;
@@ -610,6 +613,9 @@ namespace TrucoRDR2
             _roundInfo.Draw();
             _announcement.Draw();
             DrawOpponentCardBacks();
+            for (int i = 0; i < _opponentRevealSprites.Length; i++)
+                if (_opponentRevealSprites[i] != null)
+                    _opponentRevealSprites[i].Draw();
             _handTitle.Draw();
 
             for (int i = 0; i < _playedLabels.Length; i++)
@@ -1156,6 +1162,10 @@ namespace TrucoRDR2
             if (_match == null || _match.Round == null)
                 return;
 
+            for (int i = 0; i < _opponentRevealSprites.Length; i++)
+                if (_opponentRevealSprites[i] != null)
+                    return;
+
             int count = Math.Min(3, _match.Round.OpponentCards.Count);
             SizeF cardSize = LayoutSize(OpponentBackWidth, OpponentBackHeight);
             for (int i = 0; i < count; i++)
@@ -1223,6 +1233,22 @@ namespace TrucoRDR2
                 _handSprites[i] = new Sprite(
                     _textureDictionary, playerCards[i].TextureName,
                     LayoutSize(HandCardWidth, HandCardHeight), _handPositions[i]);
+            }
+
+            // Argentine truco requires the envido winner to prove the announced points.
+            // Show the opponent's hand face-up until the first card of the truco is played.
+            if (round.CardsPlayed == 0 && round.EnvidoResolved &&
+                round.EnvidoWinner == TrucoPlayer.Opponent)
+            {
+                IList<TrucoCard> opponentCards = round.OpponentCards;
+                for (int i = 0; i < opponentCards.Count && i < _opponentRevealSprites.Length; i++)
+                {
+                    _opponentRevealSprites[i] = new Sprite(
+                        _textureDictionary,
+                        opponentCards[i].TextureName,
+                        LayoutSize(OpponentBackWidth, OpponentBackHeight),
+                        _opponentCardBackPositions[i]);
+                }
             }
 
             foreach (TrucoTrick trick in round.Tricks)
@@ -1397,6 +1423,15 @@ namespace TrucoRDR2
                 {
                     _handSprites[i].Dispose();
                     _handSprites[i] = null;
+                }
+            }
+
+            for (int i = 0; i < _opponentRevealSprites.Length; i++)
+            {
+                if (_opponentRevealSprites[i] != null)
+                {
+                    _opponentRevealSprites[i].Dispose();
+                    _opponentRevealSprites[i] = null;
                 }
             }
 
