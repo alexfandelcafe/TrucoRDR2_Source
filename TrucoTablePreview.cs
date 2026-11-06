@@ -1094,7 +1094,8 @@ namespace TrucoRDR2
 
         private static float LayoutTextScale(float value)
         {
-            return value * LayoutScale;
+            // The RDR2 text scale is already resolution-relative; only coordinates and sprites scale.
+            return value;
         }
 
         private void DrawMenuSurface()
