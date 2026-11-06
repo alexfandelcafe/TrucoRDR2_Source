@@ -528,6 +528,7 @@ namespace TrucoRDR2
 
             if (_showMenu)
             {
+                DrawMenuSurface();
                 _header.Draw();
                 _menuOptions.Draw();
                 _menuHint.Draw();
@@ -537,6 +538,8 @@ namespace TrucoRDR2
             if (_match == null)
                 return;
 
+            DrawTopPanel();
+            DrawTableSurface();
             _header.Draw();
             _instructions.Draw();
 
@@ -994,9 +997,42 @@ namespace TrucoRDR2
             return value * LayoutScale;
         }
 
+        private void DrawMenuSurface()
+        {
+            PointF center = LayoutPoint(960.0f, 535.0f);
+            SizeF outer = LayoutSize(790.0f, 330.0f);
+            SizeF inner = LayoutSize(770.0f, 310.0f);
+            DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
+            DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
+            DrawRect(center.X, center.Y - LayoutLength(145.0f), LayoutLength(620.0f), LayoutLength(2.0f), 193, 157, 91, 255);
+            DrawRect(center.X, center.Y + LayoutLength(145.0f), LayoutLength(620.0f), LayoutLength(2.0f), 193, 157, 91, 255);
+        }
+
+        private void DrawTopPanel()
+        {
+            PointF center = LayoutPoint(960.0f, 188.0f);
+            SizeF outer = LayoutSize(1420.0f, 185.0f);
+            SizeF inner = LayoutSize(1404.0f, 169.0f);
+            DrawRect(center.X, center.Y, outer.Width, outer.Height, 18, 16, 13, 220);
+            DrawRect(center.X, center.Y, inner.Width, inner.Height, 32, 27, 21, 218);
+            DrawRect(center.X, center.Y - LayoutLength(82.0f), LayoutLength(1320.0f), LayoutLength(2.0f), 168, 133, 76, 235);
+        }
+
+        private void DrawTableSurface()
+        {
+            PointF center = LayoutPoint(960.0f, 480.0f);
+            SizeF outer = LayoutSize(840.0f, 225.0f);
+            SizeF middle = LayoutSize(824.0f, 209.0f);
+            SizeF inner = LayoutSize(806.0f, 191.0f);
+            DrawRect(center.X, center.Y, outer.Width, outer.Height, 27, 19, 13, 240);
+            DrawRect(center.X, center.Y, middle.Width, middle.Height, 147, 103, 54, 255);
+            DrawRect(center.X, center.Y, inner.Width, inner.Height, 31, 78, 54, 235);
+            DrawRect(center.X, center.Y, LayoutLength(2.0f), LayoutLength(165.0f), 151, 190, 128, 115);
+        }
+
         private void DrawOpponentCardBacks()
         {
-            if (_match == null || _match.Round == null || !_textureDictionaryLoaded)
+            if (_match == null || _match.Round == null)
                 return;
 
             int count = Math.Min(3, _match.Round.OpponentCards.Count);
