@@ -11,7 +11,7 @@ namespace TrucoRDR2
 {
     /// <summary>
     /// First in-game build for verifying the custom YTD before wiring in the full game/table logic.
-    /// F6 toggles the preview. PageUp/PageDown browse the 40 card textures. Escape closes it.
+    /// F7 toggles the preview. PageUp/PageDown browse the 40 card textures. Escape closes it.
     /// </summary>
     public sealed class TrucoScript : Script
     {
@@ -32,6 +32,8 @@ namespace TrucoRDR2
         private readonly TextElement _status;
 
         private bool _previewEnabled;
+        private bool _textureRequestSent;
+        private bool _spritesCreated;
         private int _firstCardIndex;
 
         public TrucoScript()
@@ -90,7 +92,8 @@ namespace TrucoRDR2
             if (e.KeyCode == Keys.PageDown)
             {
                 _firstCardIndex = (_firstCardIndex + 1) % _textureNames.Length;
-                RebuildVisibleSprites();
+                if (_spritesCreated)
+                    RebuildVisibleSprites();
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.PageUp)
@@ -114,40 +117,62 @@ namespace TrucoRDR2
             _header.Draw();
             _instructions.Draw();
 
+            bool dictionaryExists = false;
             bool dictionaryLoaded = false;
             try
             {
-                dictionaryLoaded = TXD.HAS_STREAMED_TEXTURE_DICT_LOADED(_textureDictionary);
-                if (!dictionaryLoaded)
+                // LML must register the YTD as a streaming asset before the game can request it.
+                dictionaryExists = TXD.DOES_STREAMED_TEXTURE_DICT_EXIST(_textureDictionary);
+                if (dictionaryExists)
                 {
-                    // Keep requesting the dictionary until LML/streaming makes the YTD available.
-                    TXD.REQUEST_STREAMED_TEXTURE_DICT(_textureDictionary, false);
+                    dictionaryLoaded = TXD.HAS_STREAMED_TEXTURE_DICT_LOADED(_textureDictionary);
+                    if (!dictionaryLoaded && !_textureRequestSent)
+                    {
+                        // Request once; Sprite's constructor also requests the dictionary after it loads.
+                        TXD.REQUEST_STREAMED_TEXTURE_DICT(_textureDictionary, false);
+                        _textureRequestSent = true;
+                    }
                 }
             }
-            catch
+            catch (Exception)
             {
-                // Sprite.Draw() below also guards against a dictionary which is not loaded.
+                SetStatusCaption("Error consultando el diccionario " + _textureDictionary +
+                                 ". Revisa el log de ScriptHook.");
+                _status.Draw();
+                return;
             }
 
-            if (dictionaryLoaded)
+            if (!dictionaryExists)
             {
-                SetStatusCaption("Diccionario cargado: " + _textureDictionary +
-                                 "  |  40 cartas esperadas. Si no aparecen, revisa los nombres internos del YTD.");
+                SetStatusCaption("LML no registro el YTD: " + _textureDictionary +
+                                 ". Revisa lml\\stream o el install.xml.");
+            }
+            else if (!dictionaryLoaded)
+            {
+                SetStatusCaption("YTD registrado; esperando carga: " + _textureDictionary);
             }
             else
             {
-                SetStatusCaption("Solicitando YTD: " + _textureDictionary +
-                                 "  |  Comprueba que LML cargue el archivo y que el nombre coincida.");
+                SetStatusCaption("Diccionario cargado: " + _textureDictionary +
+                                 "  |  40 cartas esperadas.");
+                if (!_spritesCreated)
+                {
+                    RebuildVisibleSprites();
+                    _spritesCreated = true;
+                }
             }
 
             _status.Draw();
 
-            for (int i = 0; i < CardsShown; i++)
+            if (_spritesCreated && dictionaryLoaded)
             {
-                if (_sprites[i] != null)
-                    _sprites[i].Draw();
+                for (int i = 0; i < CardsShown; i++)
+                {
+                    if (_sprites[i] != null)
+                        _sprites[i].Draw();
 
-                _cardLabels[i].Draw();
+                    _cardLabels[i].Draw();
+                }
             }
         }
 
@@ -167,12 +192,15 @@ namespace TrucoRDR2
             if (_previewEnabled)
             {
                 _firstCardIndex = 0;
-                RebuildVisibleSprites();
+                _textureRequestSent = false;
+                _spritesCreated = false;
                 RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas activada. Av Pag/Re Pag cambia las cartas.");
             }
             else
             {
                 DisposeSprites();
+                _spritesCreated = false;
+                _textureRequestSent = false;
                 RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas cerrada.");
             }
         }
