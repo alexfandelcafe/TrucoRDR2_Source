@@ -155,12 +155,12 @@ namespace TrucoRDR2
             {
                 _firstCardIndex = 0;
                 RebuildVisibleSprites();
-                Screen.PrintSubtitle("TrucoRDR2: vista de texturas activada. Av Pag/Re Pag cambia las cartas.");
+                RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas activada. Av Pag/Re Pag cambia las cartas.");
             }
             else
             {
                 DisposeSprites();
-                Screen.PrintSubtitle("TrucoRDR2: vista de texturas cerrada.");
+                RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas cerrada.");
             }
         }
 
