@@ -11,8 +11,8 @@ using RDR2.UI;
 namespace TrucoRDR2
 {
     /// <summary>
-    /// First in-game build for verifying the custom YTD before wiring in the full game/table logic.
-    /// F7 toggles the preview. PageUp/PageDown browse the 40 card textures. Escape closes it.
+    /// Texture validation plus an early interactive hand prototype.
+    /// F7 toggles the texture viewer; F8 opens the hand prototype against a random-play opponent.
     /// </summary>
     public sealed class TrucoScript : Script
     {
