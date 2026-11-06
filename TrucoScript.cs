@@ -134,7 +134,7 @@ namespace TrucoRDR2
 
             if (e.KeyCode == TogglePreviewKey)
             {
-                // The F7 texture viewer and the F8 table prototype are mutually exclusive.
+                // The F7 texture viewer and the Insert table prototype are mutually exclusive.
                 if (_tablePreview.IsVisible)
                 {
                     e.Handled = true;
