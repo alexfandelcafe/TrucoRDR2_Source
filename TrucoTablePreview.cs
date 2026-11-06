@@ -566,8 +566,6 @@ namespace TrucoRDR2
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(0);
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(1);
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(2);
-                PAD.DISABLE_ALL_CONTROL_ACTIONS(1);
-                PAD.DISABLE_ALL_CONTROL_ACTIONS(2);
             }
             catch
             {
@@ -1354,7 +1352,7 @@ namespace TrucoRDR2
             string third = round.Tricks.Count > 2 ? FormatTrick(round.Tricks[2]) : "-";
             SetCaption(_roundInfo,
                 "MANO: " + (round.Mano == TrucoPlayer.Player ? "VOS" : "RIVAL") +
-                "    |    RIVAL: " + round.OpponentCards.Count + " ocultas" +
+                "    |    RIVAL: " + round.OpponentCards.Count + " restantes" +
                 "    |    BAZAS: " + first + " / " + second + " / " + third +
                 "    |    TRUCO: " + round.TrucoStake + " punto(s)" +
                 "    |    FLOR: " + (_florEnabled ? "SI" : "NO"));
