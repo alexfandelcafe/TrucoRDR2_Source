@@ -63,7 +63,12 @@ namespace TrucoRDR2
             _textureDictionary = ReadTextureDictionarySetting();
             _tableToggleBinding = ReadTableToggleBinding();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
-            _tablePreview = new TrucoTablePreview(_textureDictionary, FormatKeyBinding(_tableToggleBinding));
+            _tablePreview = new TrucoTablePreview(
+                _textureDictionary,
+                FormatKeyBinding(_tableToggleBinding),
+                ReadMatchTargetSetting(),
+                ReadFlorEnabledSetting(),
+                ReadSoundEnabledSetting());
 
             string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(scriptDirectory))
@@ -122,8 +127,8 @@ namespace TrucoRDR2
                     {
                         if (_tablePreview.IsRoundComplete)
                         {
-                            _tablePreview.Start();
-                            WriteDiagnostic("Nueva mano de prueba repartida.");
+                            _tablePreview.ContinueAfterResult();
+                            WriteDiagnostic("Se avanzó a la siguiente mano o se inició una nueva partida.");
                         }
                         else
                         {
@@ -558,6 +563,76 @@ namespace TrucoRDR2
             return key == Keys.None
                 ? defaultBinding
                 : new KeyBinding(key, modifiers);
+        }
+
+        private static int ReadMatchTargetSetting()
+        {
+            int value;
+            string raw = ReadIniSetting("Game", "TargetPoints");
+            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value) &&
+                (value == 15 || value == 30))
+                return value;
+
+            return 30;
+        }
+
+        private static bool ReadFlorEnabledSetting()
+        {
+            bool value;
+            string raw = ReadIniSetting("Game", "FlorEnabled");
+            return bool.TryParse(raw, out value) ? value : false;
+        }
+
+        private static bool ReadSoundEnabledSetting()
+        {
+            bool value;
+            string raw = ReadIniSetting("Audio", "Enabled");
+            return bool.TryParse(raw, out value) ? value : true;
+        }
+
+        private static string ReadIniSetting(string sectionName, string settingName)
+        {
+            try
+            {
+                string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (string.IsNullOrEmpty(scriptDirectory))
+                    return null;
+
+                string iniPath = Path.Combine(scriptDirectory, "TrucoRDR2.ini");
+                if (!File.Exists(iniPath))
+                    return null;
+
+                string currentSection = string.Empty;
+                foreach (string rawLine in File.ReadAllLines(iniPath))
+                {
+                    string line = rawLine.Trim();
+                    if (line.Length == 0 || line.StartsWith(";") || line.StartsWith("#"))
+                        continue;
+
+                    if (line.StartsWith("[") && line.EndsWith("]"))
+                    {
+                        currentSection = line.Substring(1, line.Length - 2).Trim();
+                        continue;
+                    }
+
+                    if (!string.Equals(currentSection, sectionName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    int equalsIndex = line.IndexOf('=');
+                    if (equalsIndex <= 0)
+                        continue;
+
+                    string key = line.Substring(0, equalsIndex).Trim();
+                    if (string.Equals(key, settingName, StringComparison.OrdinalIgnoreCase))
+                        return line.Substring(equalsIndex + 1).Trim();
+                }
+            }
+            catch
+            {
+                // Optional settings always fall back to safe defaults.
+            }
+
+            return null;
         }
 
         private static string ReadTextureDictionarySetting()
