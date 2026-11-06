@@ -512,7 +512,12 @@ namespace TrucoRDR2
 
         private static float LayoutTextScale(float value)
         {
-            return value;
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return value;
+
+            // Text already scales with physical resolution; apply only the extra letterbox fit.
+            return value * LayoutScale * RDR2.UI.Screen.Height / resolution.Height;
         }
 
         private static KeyBinding ReadTableToggleBinding()
