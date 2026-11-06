@@ -999,8 +999,8 @@ namespace TrucoRDR2
             PointF target = _handPositions[index];
             PointF source = LayoutPoint(905.0f, 365.0f);
             PointF position = Lerp(source, target, t);
-            float width = Lerp(LayoutLength(72.0f), LayoutLength(HandCardWidth), t);
-            float height = Lerp(LayoutLength(108.0f), LayoutLength(HandCardHeight), t);
+            float width = Lerp(LayoutWidth(72.0f), LayoutWidth(HandCardWidth), t);
+            float height = Lerp(LayoutHeight(108.0f), LayoutHeight(HandCardHeight), t);
             DrawTransientSprite(
                 _match.Round.PlayerCards[index].TextureName,
                 new SizeF(width, height),
@@ -1046,10 +1046,10 @@ namespace TrucoRDR2
                 TextureName = card.TextureName,
                 From = from,
                 To = to,
-                FromWidth = LayoutLength(isPlayer ? HandCardWidth : OpponentBackWidth),
-                FromHeight = LayoutLength(isPlayer ? HandCardHeight : OpponentBackHeight),
-                ToWidth = LayoutLength(PlayedCardWidth),
-                ToHeight = LayoutLength(PlayedCardHeight),
+                FromWidth = LayoutWidth(isPlayer ? HandCardWidth : OpponentBackWidth),
+                FromHeight = LayoutHeight(isPlayer ? HandCardHeight : OpponentBackHeight),
+                ToWidth = LayoutWidth(PlayedCardWidth),
+                ToHeight = LayoutHeight(PlayedCardHeight),
                 StartedUtc = DateTime.UtcNow,
                 DurationSeconds = 0.28
             };
@@ -1074,41 +1074,65 @@ namespace TrucoRDR2
         {
             get
             {
-                float width = RDR2.UI.Screen.Width;
-                float height = RDR2.UI.Screen.Height;
-                if (width <= 0.0f || height <= 0.0f)
+                Size resolution = RDR2.UI.Screen.Resolution;
+                if (resolution.Width <= 0 || resolution.Height <= 0)
                     return 1.0f;
 
-                float scaleX = width / DesignWidth;
-                float scaleY = height / DesignHeight;
-                return Math.Min(scaleX, scaleY);
+                return Math.Min(
+                    resolution.Width / RDR2.UI.Screen.Width,
+                    resolution.Height / RDR2.UI.Screen.Height);
             }
         }
 
         private static PointF LayoutPoint(float x, float y)
         {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return new PointF(x, y);
+
             float scale = LayoutScale;
-            float width = RDR2.UI.Screen.Width;
-            float height = RDR2.UI.Screen.Height;
-            float offsetX = (width - DesignWidth * scale) / 2.0f;
-            float offsetY = (height - DesignHeight * scale) / 2.0f;
-            return new PointF(offsetX + x * scale, offsetY + y * scale);
+            float offsetX = (resolution.Width - RDR2.UI.Screen.Width * scale) / 2.0f;
+            float offsetY = (resolution.Height - RDR2.UI.Screen.Height * scale) / 2.0f;
+
+            // Convert the fitted physical-pixel layout back to the API's 1920x1080 coordinate base.
+            float logicalX = (offsetX + x * scale) * RDR2.UI.Screen.Width / resolution.Width;
+            float logicalY = (offsetY + y * scale) * RDR2.UI.Screen.Height / resolution.Height;
+            return new PointF(logicalX, logicalY);
         }
 
         private static SizeF LayoutSize(float width, float height)
         {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return new SizeF(width, height);
+
             float scale = LayoutScale;
-            return new SizeF(width * scale, height * scale);
+            return new SizeF(
+                width * scale * RDR2.UI.Screen.Width / resolution.Width,
+                height * scale * RDR2.UI.Screen.Height / resolution.Height);
         }
 
-        private static float LayoutLength(float value)
+        private static float LayoutWidth(float value)
         {
-            return value * LayoutScale;
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return value;
+
+            return value * LayoutScale * RDR2.UI.Screen.Width / resolution.Width;
+        }
+
+        private static float LayoutHeight(float value)
+        {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return value;
+
+            return value * LayoutScale * RDR2.UI.Screen.Height / resolution.Height;
         }
 
         private static float LayoutTextScale(float value)
         {
-            // The RDR2 text scale is already resolution-relative; only coordinates and sprites scale.
+            // TextElement.Scale is a native text scale, not a pixel coordinate.
             return value;
         }
 
@@ -1119,8 +1143,8 @@ namespace TrucoRDR2
             SizeF inner = LayoutSize(770.0f, 310.0f);
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
-            DrawRect(center.X, center.Y - LayoutLength(145.0f), LayoutLength(620.0f), LayoutLength(2.0f), 193, 157, 91, 255);
-            DrawRect(center.X, center.Y + LayoutLength(145.0f), LayoutLength(620.0f), LayoutLength(2.0f), 193, 157, 91, 255);
+            DrawRect(center.X, center.Y - LayoutHeight(145.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
+            DrawRect(center.X, center.Y + LayoutHeight(145.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
         }
 
         private void DrawTopPanel()
@@ -1130,7 +1154,7 @@ namespace TrucoRDR2
             SizeF inner = LayoutSize(1404.0f, 169.0f);
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 18, 16, 13, 220);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 32, 27, 21, 218);
-            DrawRect(center.X, center.Y - LayoutLength(82.0f), LayoutLength(1320.0f), LayoutLength(2.0f), 168, 133, 76, 235);
+            DrawRect(center.X, center.Y - LayoutHeight(82.0f), LayoutWidth(1320.0f), LayoutHeight(2.0f), 168, 133, 76, 235);
         }
 
         private void DrawTableSurface()
@@ -1142,7 +1166,7 @@ namespace TrucoRDR2
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 27, 19, 13, 240);
             DrawRect(center.X, center.Y, middle.Width, middle.Height, 147, 103, 54, 255);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 31, 78, 54, 235);
-            DrawRect(center.X, center.Y, LayoutLength(2.0f), LayoutLength(165.0f), 151, 190, 128, 115);
+            DrawRect(center.X, center.Y, LayoutHeight(2.0f), LayoutHeight(165.0f), 151, 190, 128, 115);
         }
 
         private void DrawSelectedCardFrame(int index)
@@ -1154,10 +1178,10 @@ namespace TrucoRDR2
             SizeF cardSize = LayoutSize(HandCardWidth, HandCardHeight);
             float centerX = position.X + cardSize.Width / 2.0f;
             float centerY = position.Y + cardSize.Height / 2.0f;
-            DrawRect(centerX, centerY, cardSize.Width + LayoutLength(10.0f),
-                cardSize.Height + LayoutLength(10.0f), 225, 190, 101, 255);
-            DrawRect(centerX, centerY, cardSize.Width + LayoutLength(4.0f),
-                cardSize.Height + LayoutLength(4.0f), 46, 34, 24, 255);
+            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(10.0f),
+                cardSize.Height + LayoutHeight(10.0f), 225, 190, 101, 255);
+            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(4.0f),
+                cardSize.Height + LayoutHeight(4.0f), 46, 34, 24, 255);
         }
 
         private void DrawOpponentCardBacks()
@@ -1178,12 +1202,12 @@ namespace TrucoRDR2
                 float centerY = position.Y + cardSize.Height / 2.0f;
 
                 DrawRect(centerX, centerY, cardSize.Width, cardSize.Height, 22, 20, 26, 245);
-                DrawRect(centerX, centerY, cardSize.Width - LayoutLength(5.0f), cardSize.Height - LayoutLength(5.0f), 151, 104, 51, 255);
-                DrawRect(centerX, centerY, cardSize.Width - LayoutLength(10.0f), cardSize.Height - LayoutLength(10.0f), 42, 42, 74, 255);
-                DrawRect(centerX, centerY, LayoutLength(4.0f), cardSize.Height - LayoutLength(18.0f), 202, 170, 100, 255);
-                DrawRect(centerX, centerY, cardSize.Width - LayoutLength(18.0f), LayoutLength(4.0f), 202, 170, 100, 255);
-                DrawRect(centerX, centerY, LayoutLength(15.0f), LayoutLength(15.0f), 218, 193, 135, 255);
-                DrawRect(centerX, centerY, LayoutLength(9.0f), LayoutLength(9.0f), 42, 42, 74, 255);
+                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(5.0f), cardSize.Height - LayoutHeight(5.0f), 151, 104, 51, 255);
+                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(10.0f), cardSize.Height - LayoutHeight(10.0f), 42, 42, 74, 255);
+                DrawRect(centerX, centerY, LayoutWidth(4.0f), cardSize.Height - LayoutHeight(18.0f), 202, 170, 100, 255);
+                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(18.0f), LayoutHeight(4.0f), 202, 170, 100, 255);
+                DrawRect(centerX, centerY, LayoutWidth(15.0f), LayoutHeight(15.0f), 218, 193, 135, 255);
+                DrawRect(centerX, centerY, LayoutWidth(9.0f), LayoutHeight(9.0f), 42, 42, 74, 255);
             }
         }
 
