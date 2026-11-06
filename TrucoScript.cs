@@ -12,13 +12,13 @@ namespace TrucoRDR2
 {
     /// <summary>
     /// Texture validation plus an early interactive hand prototype.
-    /// F7 toggles the texture viewer; F8 opens the hand prototype against a random-play opponent.
+    /// F7 toggles the texture viewer; Insert opens the hand prototype against a random-play opponent.
     /// </summary>
     public sealed class TrucoScript : Script
     {
         private const string DefaultTextureDictionary = "trucor2_cards";
         private const Keys TogglePreviewKey = Keys.F7;
-        private const Keys ToggleTableKey = Keys.F8;
+        private const Keys ToggleTableKey = Keys.Insert;
         private const int CardsShown = 3;
         private const float CardWidth = 180.0f;
         private const float CardHeight = 270.0f;
