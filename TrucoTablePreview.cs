@@ -13,8 +13,6 @@ namespace TrucoRDR2
     /// </summary>
     internal sealed class TrucoTablePreview
     {
-        private const float DesignWidth = 1920.0f;
-        private const float DesignHeight = 1080.0f;
         private const float HandCardWidth = 160.0f;
         private const float HandCardHeight = 240.0f;
         private const float HandTop = 700.0f;
@@ -566,6 +564,8 @@ namespace TrucoRDR2
             {
                 // Disable movement/combat, camera and frontend controls while the menu/table is open.
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(0);
+                PAD.DISABLE_ALL_CONTROL_ACTIONS(1);
+                PAD.DISABLE_ALL_CONTROL_ACTIONS(2);
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(1);
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(2);
             }
