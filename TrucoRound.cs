@@ -99,6 +99,7 @@ namespace TrucoRDR2
         public int TrucoLevel { get { return _trucoLevel; } }
         public bool FlorEnabled { get; private set; }
         public bool EnvidoResolved { get { return _envidoResolved; } }
+        public TrucoPlayer? EnvidoWinner { get; private set; }
         public bool FlorResolved { get { return _florResolved; } }
         public int CardsPlayed { get { return _tricks.Count * 2 + (PendingCard == null ? 0 : 1); } }
         public bool HasPendingResponse { get { return PendingCall != TrucoCall.None; } }
@@ -432,6 +433,7 @@ namespace TrucoRDR2
             if (accepted)
             {
                 TrucoPlayer winner = TrucoRules.CompareEnvido(_playerCards, _opponentCards, Mano);
+                EnvidoWinner = winner;
                 int playerPoints = TrucoRules.EnvidoPoints(_playerCards);
                 int opponentPoints = TrucoRules.EnvidoPoints(_opponentCards);
                 int awardedPoints = _faltaEnvidoCalled ? CalculateFaltaPoints(winner) : _pendingValue;
