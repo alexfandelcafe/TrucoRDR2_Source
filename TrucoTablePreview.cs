@@ -708,6 +708,8 @@ namespace TrucoRDR2
 
             if (round.CurrentPlayer == TrucoPlayer.Player)
                 return "TU TURNO: flechas + ENTER | E ENVIDO | R REAL | F FALTA | T TRUCO";
+            if (round.CardsPlayed == 0)
+                return "Turno del rival... También podés cantar envido antes de la primera carta (E/R/F).";
             return "Turno del rival...";
         }
 
