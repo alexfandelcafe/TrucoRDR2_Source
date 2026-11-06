@@ -53,6 +53,8 @@
     <Compile Include="CardTextureCatalog.cs" />
     <Compile Include="TrucoCard.cs" />
     <Compile Include="TrucoRules.cs" />
+    <Compile Include="TrucoDeck.cs" />
+    <Compile Include="TrucoRound.cs" />
   </ItemGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
