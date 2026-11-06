@@ -50,6 +50,7 @@ namespace TrucoRDR2
         private DateTime _textureRequestTimeUtc;
 
         public bool IsVisible { get { return _visible; } }
+        public bool IsRoundComplete { get { return _round != null && _round.IsComplete; } }
 
         public TrucoTablePreview(string textureDictionary)
         {
@@ -138,13 +139,10 @@ namespace TrucoRDR2
                 return;
             }
 
-            if (!_textureDictionaryLoaded || _round.IsComplete ||
-                _round.CurrentPlayer != TrucoPlayer.Player)
-                return;
-
             if (e.KeyCode == System.Windows.Forms.Keys.Left)
             {
-                if (_round.PlayerCards.Count > 0)
+                if (_textureDictionaryLoaded && !_round.IsComplete &&
+                    _round.CurrentPlayer == TrucoPlayer.Player && _round.PlayerCards.Count > 0)
                 {
                     _selectedCardIndex =
                         (_selectedCardIndex - 1 + _round.PlayerCards.Count) % _round.PlayerCards.Count;
@@ -154,7 +152,8 @@ namespace TrucoRDR2
             }
             else if (e.KeyCode == System.Windows.Forms.Keys.Right)
             {
-                if (_round.PlayerCards.Count > 0)
+                if (_textureDictionaryLoaded && !_round.IsComplete &&
+                    _round.CurrentPlayer == TrucoPlayer.Player && _round.PlayerCards.Count > 0)
                 {
                     _selectedCardIndex = (_selectedCardIndex + 1) % _round.PlayerCards.Count;
                     UpdateHandLabels();
@@ -163,7 +162,10 @@ namespace TrucoRDR2
             }
             else if (e.KeyCode == System.Windows.Forms.Keys.Enter)
             {
-                PlaySelectedCard();
+                if (_textureDictionaryLoaded && !_round.IsComplete &&
+                    _round.CurrentPlayer == TrucoPlayer.Player)
+                    PlaySelectedCard();
+
                 e.Handled = true;
             }
         }
@@ -359,8 +361,8 @@ namespace TrucoRDR2
             {
                 SetCaption(_status,
                     _round.Winner == TrucoPlayer.Player
-                        ? "Ganaste la mano. F8 inicia otra mano de prueba."
-                        : "El rival ganó la mano. F8 inicia otra mano de prueba.");
+                        ? "Ganaste la mano. F8 reparte otra; ESC cierra la mesa."
+                        : "El rival ganó la mano. F8 reparte otra; ESC cierra la mesa.");
             }
             else if (_round.CurrentPlayer == TrucoPlayer.Player)
             {
