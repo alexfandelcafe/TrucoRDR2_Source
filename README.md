@@ -72,7 +72,7 @@ Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que la
 
 Además del visor F7, la build incorpora una primera mano de prueba para comprobar el flujo básico de juego:
 
-- `F8`: abrir o cerrar la mesa; cuando una mano termina, F8 reparte otra mano directamente.
+- `Insert`: abrir o cerrar la mesa; cuando una mano termina, Insert reparte otra mano directamente.
 - Flechas izquierda/derecha: seleccionar una de tus cartas.
 - `Enter`: jugar la carta seleccionada.
 - `Esc`: cerrar la mesa de prueba.
@@ -81,7 +81,7 @@ Además del visor F7, la build incorpora una primera mano de prueba para comprob
 
 Esta etapa todavía no incluye los cantos de truco/retruco/vale cuatro, el desarrollo interactivo del envido, el tanteador de una partida a 15/30, flor, ni una IA estratégica. El helper `TrucoRules.EnvidoPoints` sigue disponible para la futura implementación del envido, pero todavía no se puede cantar desde el juego. En este prototipo el jugador comienza como mano en cada reparto; la alternancia de mano se agregará con el tanteador.
 
-El visor de texturas F7 y la mesa F8 son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y F8 sirve para probar una mano real con las cartas cargadas desde el YTD. La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
+El visor de texturas F7 y la mesa Insert son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y Insert sirve para probar una mano real con las cartas cargadas desde el YTD. La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
 
 ## Nota sobre validación
 
