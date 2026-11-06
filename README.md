@@ -16,11 +16,11 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
 ## Configurar el YTD
 
-1. Para una instalación manual sin manifiesto, creá `lml\\stream` si no existe y colocá el archivo directamente ahí:
+1. Para una instalación manual sin manifiesto, creá `lml\stream` si no existe y colocá el archivo directamente ahí:
 
-   `D:\Red Dead Redemption 2\lml\TrucoRDR2\stream\trucor2_cards.ytd`
+   `D:\Red Dead Redemption 2\lml\stream\trucor2_cards.ytd`
 
-   No lo dejes en `lml\\TrucoRDR2\\stream` salvo que esa carpeta de mod tenga un `install.xml` válido que registre el contenido. LML usa `lml\\stream` como carpeta de streaming manual.
+   No lo dejes en `lml\TrucoRDR2\stream` salvo que esa carpeta de mod tenga un `install.xml` válido que registre el contenido. LML usa `lml\stream` como carpeta de streaming manual.
 
 2. Abrí `scripts/TrucoRDR2.ini` y confirmá que la sección contiene:
 
@@ -58,7 +58,7 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
 Se muestran tres cartas de prueba con los nombres de textura encima. La línea de estado indica si el diccionario fue cargado por el juego.
 
-Si el estado sigue en «Solicitando YTD», revisá que `vfs.asi` esté junto a `RDR2.exe`, que exista `lml\\stream\\trucor2_cards.ytd` y buscá en el log de LML una entrada `adding` para ese YTD. Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que el YTD sea un diccionario válido para RDR2 y que sus texturas internas se llamen exactamente `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc.
+Si el estado sigue en «Solicitando YTD», revisá que `vfs.asi` esté junto a `RDR2.exe`, que exista `lml\stream\\trucor2_cards.ytd` y buscá en el log de LML una entrada `adding` para ese YTD. Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que el YTD sea un diccionario válido para RDR2 y que sus texturas internas se llamen exactamente `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc.
 
 ## Nota sobre validación
 
