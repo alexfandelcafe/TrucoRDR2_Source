@@ -12,13 +12,24 @@ namespace TrucoRDR2
 {
     /// <summary>
     /// Texture validation plus an early interactive hand prototype.
-    /// F7 toggles the texture viewer; Insert opens the hand prototype against a random-play opponent.
+    /// F7 toggles the texture viewer; Ctrl+F9 opens the hand prototype against a random-play opponent.
     /// </summary>
     public sealed class TrucoScript : Script
     {
+        private struct KeyBinding
+        {
+            public readonly Keys Key;
+            public readonly Keys Modifiers;
+
+            public KeyBinding(Keys key, Keys modifiers)
+            {
+                Key = key;
+                Modifiers = modifiers;
+            }
+        }
+
         private const string DefaultTextureDictionary = "trucor2_cards";
         private const Keys TogglePreviewKey = Keys.F7;
-        private const Keys ToggleTableKey = Keys.Insert;
         private const int CardsShown = 3;
         private const float CardWidth = 180.0f;
         private const float CardHeight = 270.0f;
@@ -26,6 +37,7 @@ namespace TrucoRDR2
         private const double MissingDictionaryGraceSeconds = 5.0;
 
         private readonly string _textureDictionary;
+        private readonly KeyBinding _tableToggleBinding;
         private readonly string[] _textureNames;
         private readonly PointF[] _cardPositions;
         private readonly Sprite[] _sprites = new Sprite[CardsShown];
@@ -49,6 +61,7 @@ namespace TrucoRDR2
         {
             Interval = 0;
             _textureDictionary = ReadTextureDictionarySetting();
+            _tableToggleBinding = ReadTableToggleBinding();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
             _tablePreview = new TrucoTablePreview(_textureDictionary);
 
@@ -99,7 +112,7 @@ namespace TrucoRDR2
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == ToggleTableKey)
+            if (e.KeyCode == _tableToggleBinding.Key && e.Modifiers == _tableToggleBinding.Modifiers)
             {
                 // Ignore repeated KeyDown events until the physical key is released.
                 if (!_tableToggleKeyDown)
@@ -134,7 +147,7 @@ namespace TrucoRDR2
 
             if (e.KeyCode == TogglePreviewKey)
             {
-                // The F7 texture viewer and the Insert table prototype are mutually exclusive.
+                // The F7 texture viewer and the Ctrl+F9 table prototype are mutually exclusive.
                 if (_tablePreview.IsVisible)
                 {
                     e.Handled = true;
@@ -185,7 +198,7 @@ namespace TrucoRDR2
 
         private void OnKeyUp(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == ToggleTableKey)
+            if (e.KeyCode == _tableToggleBinding.Key && _tableToggleKeyDown)
             {
                 _tableToggleKeyDown = false;
                 e.Handled = true;
@@ -435,6 +448,103 @@ namespace TrucoRDR2
             {
                 // Diagnostics must never prevent the script from running.
             }
+        }
+
+        private static KeyBinding ReadTableToggleBinding()
+        {
+            KeyBinding defaultBinding = new KeyBinding(Keys.F9, Keys.Control);
+
+            try
+            {
+                string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (string.IsNullOrEmpty(scriptDirectory))
+                    return defaultBinding;
+
+                string iniPath = Path.Combine(scriptDirectory, "TrucoRDR2.ini");
+                if (!File.Exists(iniPath))
+                    return defaultBinding;
+
+                string currentSection = string.Empty;
+                foreach (string rawLine in File.ReadAllLines(iniPath))
+                {
+                    string line = rawLine.Trim();
+                    if (line.Length == 0 || line.StartsWith(";") || line.StartsWith("#"))
+                        continue;
+
+                    if (line.StartsWith("[") && line.EndsWith("]"))
+                    {
+                        currentSection = line.Substring(1, line.Length - 2).Trim();
+                        continue;
+                    }
+
+                    if (!string.Equals(currentSection, "Controls", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    int equalsIndex = line.IndexOf('=');
+                    if (equalsIndex <= 0)
+                        continue;
+
+                    string key = line.Substring(0, equalsIndex).Trim();
+                    string value = line.Substring(equalsIndex + 1).Trim();
+                    if (string.Equals(key, "TableToggle", StringComparison.OrdinalIgnoreCase) && value.Length > 0)
+                        return ParseKeyBinding(value, defaultBinding);
+                }
+            }
+            catch
+            {
+                // A malformed optional control setting must not prevent the script from loading.
+            }
+
+            return defaultBinding;
+        }
+
+        private static KeyBinding ParseKeyBinding(string value, KeyBinding defaultBinding)
+        {
+            Keys key = Keys.None;
+            Keys modifiers = Keys.None;
+
+            string[] parts = value.Split('+');
+            foreach (string rawPart in parts)
+            {
+                string part = rawPart.Trim();
+                if (part.Length == 0)
+                    return defaultBinding;
+
+                if (string.Equals(part, "Ctrl", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(part, "Control", StringComparison.OrdinalIgnoreCase))
+                {
+                    modifiers |= Keys.Control;
+                }
+                else if (string.Equals(part, "Shift", StringComparison.OrdinalIgnoreCase))
+                {
+                    modifiers |= Keys.Shift;
+                }
+                else if (string.Equals(part, "Alt", StringComparison.OrdinalIgnoreCase))
+                {
+                    modifiers |= Keys.Alt;
+                }
+                else
+                {
+                    Keys parsedKey;
+                    if (key != Keys.None ||
+                        !Enum.TryParse(part, true, out parsedKey) ||
+                        !Enum.IsDefined(typeof(Keys), parsedKey) ||
+                        parsedKey == Keys.None ||
+                        (parsedKey & Keys.Modifiers) != Keys.None ||
+                        parsedKey == Keys.ControlKey ||
+                        parsedKey == Keys.ShiftKey ||
+                        parsedKey == Keys.Menu)
+                    {
+                        return defaultBinding;
+                    }
+
+                    key = parsedKey;
+                }
+            }
+
+            return key == Keys.None
+                ? defaultBinding
+                : new KeyBinding(key, modifiers);
         }
 
         private static string ReadTextureDictionarySetting()
