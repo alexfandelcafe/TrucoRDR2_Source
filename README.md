@@ -2,7 +2,7 @@
 
 Este proyecto C# compila como `TrucoRDR2.dll` para ScriptHookRDR2DotNet V2.2.0 / .NET Framework 4.8.
 
-**Alcance de esta build:** validar que RDR2 carga el YTD personalizado y que los nombres de textura coinciden. También incorpora el primer prototipo interactivo de una mano entre el jugador y un rival de prueba. Todavía no implementa una partida completa con apuestas, tanteador, cantos de envido/truco ni IA estratégica.
+**Alcance de esta build:** carga y prueba las 40 texturas y ofrece una partida mano a mano de truco argentino con tanteador, apuestas de envido y truco, flor opcional, y un rival con estrategia básica. La IA es heurística y todavía necesita ajustes a partir de las pruebas dentro del juego.
 
 ## Requisitos
 
@@ -70,20 +70,71 @@ Si el estado muestra «El juego no encuentra…», abrí `scripts\TrucoRDR2.log`
 
 Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que las texturas internas se llamen exactamente `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. y revisá la tabla de nombres de la herramienta antes de generar el YTD.
 
-## Primera mano interactiva (prototipo)
+## Partida de truco mano a mano
 
-Además del visor F7, la build incorpora una primera mano de prueba para comprobar el flujo básico de juego:
+La mesa permite disputar partidas completas entre el jugador y un rival controlado por la IA.
 
-- `Ctrl+F9` (configurable): abrir o cerrar la mesa; cuando una mano termina, la misma combinación reparte otra mano.
-- Flechas izquierda/derecha: seleccionar una de tus cartas.
+### Configuración
+
+En `scripts/TrucoRDR2.ini`:
+
+```ini
+[Game]
+; 15 o 30 puntos.
+TargetPoints=30
+; Flor es opcional.
+FlorEnabled=false
+
+[Audio]
+Enabled=true
+```
+
+- `TargetPoints=15`: partida corta a 15.
+- `TargetPoints=30`: partida tradicional a 30, con malas y buenas.
+- `FlorEnabled=true`: activa la flor. Si solo un jugador tiene flor, se cuenta automáticamente; si ambos tienen, se abre la respuesta y las subidas.
+- `Enabled=true`: reproduce sonidos de interfaz que ya incluye RDR2.
+
+### Controles durante tu turno
+
+- Flechas izquierda/derecha: seleccionar una carta.
 - `Enter`: jugar la carta seleccionada.
-- `Esc`: cerrar la mesa de prueba.
-- El rival recibe tres cartas que permanecen ocultas y juega una carta legal al azar cuando le toca.
-- La pantalla muestra las bazas resueltas, las pardas y quién ganó la mano.
+- `E`: cantar Envido.
+- `R`: cantar Real Envido.
+- `F`: cantar Falta Envido.
+- `T`: cantar Truco, Retruco o Vale Cuatro según la etapa de la apuesta.
 
-Esta etapa todavía no incluye los cantos de truco/retruco/vale cuatro, el desarrollo interactivo del envido, el tanteador de una partida a 15/30, flor, ni una IA estratégica. El helper `TrucoRules.EnvidoPoints` sigue disponible para la futura implementación del envido, pero todavía no se puede cantar desde el juego. En este prototipo el jugador comienza como mano en cada reparto; la alternancia de mano se agregará con el tanteador.
+### Responder a un canto
 
-El visor de texturas F7 y la mesa Ctrl+F9 son modos separados: F7 sigue sirviendo para recorrer las 40 texturas y Ctrl+F9 sirve para probar una mano real con las cartas cargadas desde el YTD. Se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts). La posición y escala de la mesa son provisionales y se ajustarán después de verla funcionando dentro del juego.
+- `Q`: Quiero.
+- `N`: No quiero.
+- `E`, `R`, `F`: subir el envido cuando la secuencia lo permite.
+- `T`: subir de Truco a Retruco o de Retruco a Vale Cuatro.
+- `C`: Contra Flor.
+- `B`: Contra Flor al Resto.
+
+Las opciones que no correspondan al canto pendiente se ignoran. El envido se cierra cuando se juega la primera carta. La flor bloquea el envido cuando está habilitada y aparece en la mano.
+
+### Desarrollo de la partida
+
+- El tanteador se actualiza automáticamente con los puntos de envido, flor y truco.
+- La mano rota entre jugador y rival.
+- Se juega al mejor de tres bazas, con resolución de pardas.
+- El truco vale 1 sin canto, 2 con Truco querido, 3 con Retruco querido y 4 con Vale Cuatro querido.
+- No querer Truco, Retruco o Vale Cuatro entrega la mano por el valor anterior de la apuesta.
+- Al terminar una mano, `Enter` reparte la siguiente.
+- Al terminar la partida, `Enter` comienza una partida nueva.
+- `Esc` cierra la mesa.
+- La combinación configurada en `[Controls]` abre/cierra la mesa. El valor predeterminado es `Ctrl+F9`; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
+
+### Rival controlado por IA
+
+El rival ya no juega cartas al azar. Evalúa su envido, la fuerza de su mano, la carta que tiene enfrente y el tamaño de la apuesta. Puede cantar o subir apuestas y aceptar/rechazar según su mano y el tanteador. Esta primera IA es deliberadamente básica: no simula todos los estilos humanos y deberá ajustarse con pruebas reales.
+
+### Interfaz e integración con RDR2
+
+La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Los efectos de interfaz utilizan sonidos internos de RDR2. Mientras la mesa está abierta, el script intenta bloquear los controles normales de movimiento y combate para que el personaje no actúe detrás de la interfaz.
+
+La escala y la posición de la mesa siguen siendo provisionales. Se ajustarán después de las pruebas en distintas resoluciones.
 
 ## Nota sobre validación
 
