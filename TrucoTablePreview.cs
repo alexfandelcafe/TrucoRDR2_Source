@@ -199,9 +199,9 @@ namespace TrucoRDR2
             string soundPrefix = _menuSelection == 3 ? "> " : "  ";
 
             SetCaption(_menuOptions,
-                startPrefix + "INICIAR PARTIDA\\n" +
-                pointsPrefix + "DURACION: " + target + "\\n" +
-                florPrefix + "FLOR: " + flor + "\\n" +
+                startPrefix + "INICIAR PARTIDA\n" +
+                pointsPrefix + "DURACION: " + target + "\n" +
+                florPrefix + "FLOR: " + flor + "\n" +
                 soundPrefix + "SONIDO: " + sound);
 
             SetCaption(_menuHint,
