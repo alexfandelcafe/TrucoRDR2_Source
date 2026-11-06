@@ -519,8 +519,9 @@ namespace TrucoRDR2
                 }
 
                 int strength = round.HandStrength(TrucoPlayer.Opponent);
-                int threshold = round.PendingValue >= 3 ? 25 : 21;
-                if (pending == TrucoCall.Truco && strength >= 34 && round.RaiseTruco(TrucoPlayer.Opponent))
+                int threshold = round.PendingValue >= 2 ? 25 : 21;
+                if ((pending == TrucoCall.Truco || pending == TrucoCall.Retruco) &&
+                    strength >= 34 && round.RaiseTruco(TrucoPlayer.Opponent))
                 {
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                     return;
