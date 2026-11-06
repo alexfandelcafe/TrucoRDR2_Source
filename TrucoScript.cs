@@ -107,8 +107,16 @@ namespace TrucoRDR2
                     _tableToggleKeyDown = true;
                     if (_tablePreview.IsVisible)
                     {
-                        _tablePreview.Close();
-                        WriteDiagnostic("Mesa de prueba cerrada.");
+                        if (_tablePreview.IsRoundComplete)
+                        {
+                            _tablePreview.Start();
+                            WriteDiagnostic("Nueva mano de prueba repartida.");
+                        }
+                        else
+                        {
+                            _tablePreview.Close();
+                            WriteDiagnostic("Mesa de prueba cerrada.");
+                        }
                     }
                     else
                     {
