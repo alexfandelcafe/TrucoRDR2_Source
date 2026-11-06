@@ -72,7 +72,7 @@ Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que la
 
 Además del visor F7, la build incorpora una primera mano de prueba para comprobar el flujo básico de juego:
 
-- `F8`: abrir o cerrar la mesa de prueba. Si la mano terminó, cerrá y volvé a abrir con F8 para repartir otra.
+- `F8`: abrir o cerrar la mesa; cuando una mano termina, F8 reparte otra mano directamente.
 - Flechas izquierda/derecha: seleccionar una de tus cartas.
 - `Enter`: jugar la carta seleccionada.
 - `Esc`: cerrar la mesa de prueba.
