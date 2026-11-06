@@ -1266,13 +1266,21 @@ namespace TrucoRDR2
                     LayoutSize(HandCardWidth, HandCardHeight), _handPositions[i]);
             }
 
-            // Argentine truco requires the envido winner to prove the announced points.
-            // Show the opponent's hand face-up until the first card of the truco is played.
-            if ((_match.IsComplete || round.IsComplete) && round.EnvidoResolved &&
-                round.EnvidoWinner == TrucoPlayer.Opponent)
+            // The envido winner proves the announced points at the end of the hand.
+            // A flor is shown as soon as it is announced/resolved, before card play.
+            bool revealEnvidoProof = (_match.IsComplete || round.IsComplete) &&
+                round.EnvidoResolved && round.EnvidoWinner == TrucoPlayer.Opponent;
+            bool florCallVisible = round.PendingCall == TrucoCall.Flor ||
+                round.PendingCall == TrucoCall.ContraFlor ||
+                round.PendingCall == TrucoCall.ContraFlorAlResto;
+            bool revealFlorProof = round.FlorEnabled && round.OpponentHadFlor &&
+                ((round.CardsPlayed == 0 && (round.FlorResolved || florCallVisible)) ||
+                 ((round.IsComplete || _match.IsComplete) && round.FlorResolved));
+
+            if (revealEnvidoProof || revealFlorProof)
             {
-                // Played cards already prove part of the envido; show only remaining cards
-                // face-up at the end of the hand, avoiding duplicate sprites on the table.
+                // Played cards already prove part of the hand; show only cards still held
+                // in the opponent's hand, avoiding duplicates on the table.
                 IList<TrucoCard> opponentCards = round.OpponentCards;
                 for (int i = 0; i < opponentCards.Count && i < _opponentRevealSprites.Length; i++)
                 {
