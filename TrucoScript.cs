@@ -12,7 +12,7 @@ namespace TrucoRDR2
 {
     /// <summary>
     /// Texture validation plus an early interactive hand prototype.
-    /// F7 toggles the texture viewer; Ctrl+F9 opens the hand prototype against a random-play opponent.
+    /// F7 toggles the texture viewer; Ctrl+F9 opens the mano a mano table against a basic strategic opponent.
     /// </summary>
     public sealed class TrucoScript : Script
     {
@@ -551,7 +551,11 @@ namespace TrucoRDR2
                         (parsedKey & Keys.Modifiers) != Keys.None ||
                         parsedKey == Keys.ControlKey ||
                         parsedKey == Keys.ShiftKey ||
-                        parsedKey == Keys.Menu)
+                        parsedKey == Keys.Menu ||
+                        parsedKey == Keys.F7 ||
+                        parsedKey == Keys.F8 ||
+                        parsedKey == Keys.F6 ||
+                        parsedKey == Keys.Insert)
                     {
                         return defaultBinding;
                     }
