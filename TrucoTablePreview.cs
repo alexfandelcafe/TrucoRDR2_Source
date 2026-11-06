@@ -342,7 +342,6 @@ namespace TrucoRDR2
                 // Input suppression is best-effort and must not stop the table from rendering.
             }
 
-            AdvanceComputer();
             _header.Draw();
             _instructions.Draw();
 
@@ -382,6 +381,8 @@ namespace TrucoRDR2
                 DrawHandLabels();
                 return;
             }
+
+            AdvanceComputer();
 
             if (!_spritesCreated)
                 RefreshSprites();
