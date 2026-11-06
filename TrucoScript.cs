@@ -16,6 +16,7 @@ namespace TrucoRDR2
     public sealed class TrucoScript : Script
     {
         private const string DefaultTextureDictionary = "trucor2_cards";
+        private const Keys TogglePreviewKey = Keys.F7;
         private const int CardsShown = 3;
         private const float CardWidth = 180.0f;
         private const float CardHeight = 270.0f;
@@ -52,7 +53,7 @@ namespace TrucoRDR2
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
-                "F6: mostrar/ocultar    AV PAG: siguiente    RE PAG: anterior    ESC: cerrar",
+                "F7: mostrar/ocultar    AV PAG: siguiente    RE PAG: anterior    ESC: cerrar",
                 new PointF(960.0f, 125.0f), 0.40f, Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
@@ -76,7 +77,7 @@ namespace TrucoRDR2
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.F6)
+            if (e.KeyCode == TogglePreviewKey)
             {
                 SetPreviewEnabled(!_previewEnabled);
                 e.Handled = true;
@@ -117,6 +118,11 @@ namespace TrucoRDR2
             try
             {
                 dictionaryLoaded = TXD.HAS_STREAMED_TEXTURE_DICT_LOADED(_textureDictionary);
+                if (!dictionaryLoaded)
+                {
+                    // Keep requesting the dictionary until LML/streaming makes the YTD available.
+                    TXD.REQUEST_STREAMED_TEXTURE_DICT(_textureDictionary, false);
+                }
             }
             catch
             {
@@ -125,13 +131,13 @@ namespace TrucoRDR2
 
             if (dictionaryLoaded)
             {
-                _status.Caption = "Diccionario cargado: " + _textureDictionary +
-                                  "  |  Mazo de truco: 40 texturas (sin 8 ni 9)";
+                SetStatusCaption("Diccionario cargado: " + _textureDictionary +
+                                 "  |  40 cartas esperadas. Si no aparecen, revisa los nombres internos del YTD.");
             }
             else
             {
-                _status.Caption = "Esperando YTD: " + _textureDictionary +
-                                  "  |  Comprueba LML y el nombre del diccionario.";
+                SetStatusCaption("Solicitando YTD: " + _textureDictionary +
+                                 "  |  Comprueba que LML cargue el archivo y que el nombre coincida.");
             }
 
             _status.Draw();
@@ -143,6 +149,13 @@ namespace TrucoRDR2
 
                 _cardLabels[i].Draw();
             }
+        }
+
+        private void SetStatusCaption(string caption)
+        {
+            // Avoid resetting the text element every frame while the load state is unchanged.
+            if (!string.Equals(_status.Caption, caption, StringComparison.Ordinal))
+                _status.Caption = caption;
         }
 
         private void SetPreviewEnabled(bool enabled)
