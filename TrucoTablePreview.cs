@@ -22,9 +22,11 @@ namespace TrucoRDR2
 
         private readonly string _textureDictionary;
         private readonly string _tableToggleText;
-        private readonly int _targetPoints;
-        private readonly bool _florEnabled;
-        private readonly bool _soundEnabled;
+        private int _targetPoints;
+        private bool _florEnabled;
+        private bool _soundEnabled;
+        private bool _showMenu;
+        private int _menuSelection;
         private readonly Random _random = new Random();
 
         private readonly PointF[] _handPositions =
@@ -47,6 +49,8 @@ namespace TrucoRDR2
         private readonly TextElement _announcement;
         private readonly TextElement _handTitle;
         private readonly TextElement _status;
+        private readonly TextElement _menuOptions;
+        private readonly TextElement _menuHint;
         private readonly TextElement[] _handLabels = new TextElement[3];
         private readonly TextElement[] _playedLabels = new TextElement[6];
         private readonly Sprite[] _handSprites = new Sprite[3];
@@ -116,6 +120,16 @@ namespace TrucoRDR2
                 new PointF(960.0f, 1025.0f), 0.39f, Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
+            _menuOptions = new TextElement(
+                string.Empty,
+                new PointF(960.0f, 470.0f), 0.60f, Color.WhiteSmoke,
+                Alignment.Center, true, true);
+
+            _menuHint = new TextElement(
+                string.Empty,
+                new PointF(960.0f, 650.0f), 0.38f, Color.Wheat,
+                Alignment.Center, true, true);
+
             for (int i = 0; i < 3; i++)
             {
                 _handLabels[i] = new TextElement(
@@ -136,13 +150,17 @@ namespace TrucoRDR2
 
         public void Start()
         {
-            bool newMatch = _match == null;
             _visible = true;
 
-            if (newMatch)
+            if (_match == null)
             {
-                _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
-                _selectedCardIndex = 0;
+                _showMenu = true;
+                _menuSelection = 0;
+                UpdateMenuText();
+            }
+            else
+            {
+                _showMenu = false;
             }
 
             DisposeSprites();
@@ -152,9 +170,42 @@ namespace TrucoRDR2
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _spritesCreated = false;
             UpdateHandLabels();
+        }
 
-            if (newMatch)
-                TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
+        private void StartMatch()
+        {
+            _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
+            _showMenu = false;
+            _selectedCardIndex = 0;
+            _textureRequestSent = false;
+            _textureDictionaryLoaded = false;
+            _textureRequestTimeUtc = DateTime.UtcNow;
+            _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
+            _spritesCreated = false;
+            DisposeSprites();
+            UpdateHandLabels();
+            TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
+        }
+
+        private void UpdateMenuText()
+        {
+            string target = _targetPoints == 15 ? "15 PUNTOS" : "30 PUNTOS";
+            string flor = _florEnabled ? "ACTIVADA" : "DESACTIVADA";
+            string sound = _soundEnabled ? "ACTIVADO" : "DESACTIVADO";
+
+            string startPrefix = _menuSelection == 0 ? "> " : "  ";
+            string pointsPrefix = _menuSelection == 1 ? "> " : "  ";
+            string florPrefix = _menuSelection == 2 ? "> " : "  ";
+            string soundPrefix = _menuSelection == 3 ? "> " : "  ";
+
+            SetCaption(_menuOptions,
+                startPrefix + "INICIAR PARTIDA\\n" +
+                pointsPrefix + "DURACION: " + target + "\\n" +
+                florPrefix + "FLOR: " + flor + "\\n" +
+                soundPrefix + "SONIDO: " + sound);
+
+            SetCaption(_menuHint,
+                "ARRIBA/ABAJO: elegir    IZQUIERDA/DERECHA: cambiar    ENTER: confirmar    ESC: cerrar");
         }
 
         public void ContinueAfterResult()
@@ -162,12 +213,20 @@ namespace TrucoRDR2
             if (_match == null) return;
 
             if (_match.IsComplete)
-                _match.Restart();
-            else if (_match.Round.IsComplete)
-                _match.StartNextRound();
-            else
+            {
+                _match = null;
+                _showMenu = true;
+                _menuSelection = 0;
+                DisposeSprites();
+                _spritesCreated = false;
+                UpdateMenuText();
+                return;
+            }
+
+            if (!_match.Round.IsComplete)
                 return;
 
+            _match.StartNextRound();
             _selectedCardIndex = 0;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _spritesCreated = false;
@@ -188,11 +247,20 @@ namespace TrucoRDR2
 
         public void HandleKeyDown(KeyEventArgs e)
         {
-            if (!_visible || _match == null)
+            if (!_visible)
                 return;
 
             // All keyboard input belongs to the table while it is visible.
             e.Handled = true;
+
+            if (_showMenu)
+            {
+                HandleMenuKeyDown(e);
+                return;
+            }
+
+            if (_match == null)
+                return;
 
             if (e.KeyCode == Keys.Escape)
             {
@@ -254,6 +322,55 @@ namespace TrucoRDR2
             if (e.KeyCode == Keys.E || e.KeyCode == Keys.R ||
                 e.KeyCode == Keys.F || e.KeyCode == Keys.T)
                 e.Handled = true;
+        }
+
+        private void HandleMenuKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                Close();
+                return;
+            }
+
+            if (e.KeyCode == Keys.Up)
+            {
+                _menuSelection = (_menuSelection - 1 + 4) % 4;
+                UpdateMenuText();
+                TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
+                return;
+            }
+
+            if (e.KeyCode == Keys.Down)
+            {
+                _menuSelection = (_menuSelection + 1) % 4;
+                UpdateMenuText();
+                TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
+                return;
+            }
+
+            if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Right || e.KeyCode == Keys.Enter)
+            {
+                if (_menuSelection == 0)
+                {
+                    if (e.KeyCode == Keys.Enter)
+                        StartMatch();
+                }
+                else if (_menuSelection == 1)
+                {
+                    _targetPoints = _targetPoints == 15 ? 30 : 15;
+                }
+                else if (_menuSelection == 2)
+                {
+                    _florEnabled = !_florEnabled;
+                }
+                else if (_menuSelection == 3)
+                {
+                    _soundEnabled = !_soundEnabled;
+                }
+
+                UpdateMenuText();
+                TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
+            }
         }
 
         private void HandlePendingResponse(KeyEventArgs e)
@@ -329,7 +446,18 @@ namespace TrucoRDR2
 
         public void Draw()
         {
-            if (!_visible || _match == null)
+            if (!_visible)
+                return;
+
+            if (_showMenu)
+            {
+                _header.Draw();
+                _menuOptions.Draw();
+                _menuHint.Draw();
+                return;
+            }
+
+            if (_match == null)
                 return;
 
             try
@@ -671,7 +799,7 @@ namespace TrucoRDR2
 
             if (_match.IsComplete)
                 return (_match.Winner == TrucoPlayer.Player ? "GANASTE LA PARTIDA" : "EL RIVAL GANO LA PARTIDA") +
-                       ". ENTER: nueva partida.";
+                       ". ENTER: volver al menú.";
             if (round.IsComplete)
                 return (round.Winner == TrucoPlayer.Player ? "Ganaste la mano" : "El rival ganó la mano") +
                        " (" + round.PointsAwardedForHand + " puntos). ENTER: siguiente mano.";
