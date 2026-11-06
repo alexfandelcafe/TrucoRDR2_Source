@@ -123,7 +123,7 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 - El truco vale 1 sin canto, 2 con Truco querido, 3 con Retruco querido y 4 con Vale Cuatro querido. Falta Envido aceptado se calcula según la puntuación de la partida; no se suma como si fuera un Envido o Real Envido normal. Si se rechaza una subida, se cobran los puntos correspondientes a la apuesta previamente establecida para el jugador que lanzó la subida.
 - No querer Truco, Retruco o Vale Cuatro entrega la mano por el valor anterior de la apuesta.
 - Al terminar una mano, `Enter` reparte la siguiente.
-- Al terminar la partida, `Enter` comienza una partida nueva.
+- Al terminar la partida, `Enter` vuelve al menú; desde ahí podés iniciar otra.
 - `Esc` cierra la mesa.
 - La combinación configurada en `[Controls]` abre/cierra la mesa. El valor predeterminado es `Ctrl+F9`; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
 
@@ -131,17 +131,15 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 
 El rival ya no juega cartas al azar. Evalúa su envido, la fuerza de su mano, la carta que tiene enfrente y el tamaño de la apuesta. Puede cantar o subir apuestas y aceptar/rechazar según su mano y el tanteador. Esta primera IA es deliberadamente básica: no simula todos los estilos humanos y deberá ajustarse con pruebas reales.
 
-### Interfaz e integración con RDR2
+### Interfaz y presentación
 
-La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Las cartas se animan al repartirse y al jugarse. Los efectos de interfaz utilizan sonidos internos de RDR2. Mientras la mesa o su menú están abiertos, el script intenta bloquear los controles normales de movimiento y combate para que el personaje no actúe detrás de la interfaz.
-
-La escala y la posición de la mesa siguen siendo provisionales. Se ajustarán después de las pruebas en distintas resoluciones.
+La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa paneles de estilo madera y paño verde, reversos de cartas dibujados por el mod, resaltado de la carta seleccionada y animaciones básicas al repartir y jugar. Los efectos son sonidos del HUD que ya incluye RDR2. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; la escala final se ajustará según las pruebas en el juego.
 
 ## Integración y comportamiento
 
-- La mesa intenta desactivar los controles de jugador, cámara y frontend mientras está abierta para evitar acciones del personaje desde detrás de la interfaz.
+- La mesa desactiva los grupos de controles de jugador, cámara y frontend mientras está abierta para evitar acciones del personaje desde detrás de la interfaz.
 - La partida no congela el mundo: si una caída o un ataque reduce la salud del personaje, el overlay se cierra automáticamente, pero conserva la mano y el tanteador para reanudar con Ctrl+F9.
-- La combinación de apertura se lee al cargar el script desde la sección Controls de TrucoRDR2.ini; los cambios requieren volver a cargar/reiniciar el script.
+- La combinación de apertura se lee al cargar el script desde la sección [Controls] de TrucoRDR2.ini; los cambios requieren volver a cargar/reiniciar el script.
 - La escala y las posiciones están basadas en un marco de 1920×1080 que se adapta con letterboxing a proporciones distintas. Se pueden retocar durante la prueba en el juego.
 
 ## Nota sobre validación
