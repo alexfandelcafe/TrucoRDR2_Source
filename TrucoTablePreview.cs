@@ -631,6 +631,10 @@ namespace TrucoRDR2
 
             for (int i = 0; i < _handSprites.Length; i++)
             {
+                if (i == _selectedCardIndex && _match.Round.CurrentPlayer == TrucoPlayer.Player &&
+                    !_match.Round.IsComplete && !_match.Round.HasPendingResponse)
+                    DrawSelectedCardFrame(i);
+
                 if (_handSprites[i] != null)
                 {
                     if (!DrawDealingCard(i))
@@ -1129,6 +1133,21 @@ namespace TrucoRDR2
             DrawRect(center.X, center.Y, middle.Width, middle.Height, 147, 103, 54, 255);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 31, 78, 54, 235);
             DrawRect(center.X, center.Y, LayoutLength(2.0f), LayoutLength(165.0f), 151, 190, 128, 115);
+        }
+
+        private void DrawSelectedCardFrame(int index)
+        {
+            if (index < 0 || index >= _handPositions.Length)
+                return;
+
+            PointF position = _handPositions[index];
+            SizeF cardSize = LayoutSize(HandCardWidth, HandCardHeight);
+            float centerX = position.X + cardSize.Width / 2.0f;
+            float centerY = position.Y + cardSize.Height / 2.0f;
+            DrawRect(centerX, centerY, cardSize.Width + LayoutLength(10.0f),
+                cardSize.Height + LayoutLength(10.0f), 225, 190, 101, 255);
+            DrawRect(centerX, centerY, cardSize.Width + LayoutLength(4.0f),
+                cardSize.Height + LayoutLength(4.0f), 46, 34, 24, 255);
         }
 
         private void DrawOpponentCardBacks()
