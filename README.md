@@ -2,7 +2,7 @@
 
 Este proyecto C# compila como `TrucoRDR2.dll` para ScriptHookRDR2DotNet V2.2.0 / .NET Framework 4.8.
 
-**Alcance de esta build:** validar que RDR2 carga el YTD personalizado y que los nombres de textura coinciden. Incluye el catálogo de 40 cartas del truco argentino y helpers puros de jerarquía/envido. Todavía no implementa la partida completa, la mesa, los NPC ni la IA.
+**Alcance de esta build:** validar que RDR2 carga el YTD personalizado y que los nombres de textura coinciden. También incorpora el primer prototipo interactivo de una mano entre el jugador y un rival de prueba. Todavía no implementa una partida completa con apuestas, tanteador, cantos de envido/truco ni IA estratégica.
 
 ## Requisitos
 
