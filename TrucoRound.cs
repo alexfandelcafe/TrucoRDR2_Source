@@ -441,7 +441,7 @@ namespace TrucoRDR2
                 EnvidoWinner = winner;
                 int playerPoints = TrucoRules.EnvidoPoints(_playerCards);
                 int opponentPoints = TrucoRules.EnvidoPoints(_opponentCards);
-                int awardedPoints = _faltaEnvidoCalled ? CalculateFaltaPoints(winner) : _pendingValue;
+                int awardedPoints = _faltaEnvidoCalled ? CalculateFaltaPoints(winner) : PendingValue;
                 Award(winner, awardedPoints, "Envido ganado (" + playerPoints + " a " + opponentPoints + ")");
                 LastAnnouncement = "Envido querido: " + playerPoints + " a " + opponentPoints +
                                     ". Gana " + PlayerName(winner) + " (" + awardedPoints + " puntos).";
@@ -469,9 +469,9 @@ namespace TrucoRDR2
                 TrucoPlayer winner = TrucoRules.CompareFlor(_playerCards, _opponentCards, Mano);
                 int playerPoints = TrucoRules.FlorPoints(_playerCards);
                 int opponentPoints = TrucoRules.FlorPoints(_opponentCards);
-                int awardedPoints = _florCalls.Contains(TrucoCall.ContraFlorAlResto)
+                int awardedPoints = PendingCall == TrucoCall.ContraFlorAlResto
                     ? CalculateFaltaPoints(winner)
-                    : _pendingValue;
+                    : PendingValue;
                 Award(winner, awardedPoints, "Flor ganada (" + playerPoints + " a " + opponentPoints + ")");
                 LastAnnouncement = "Flor querida: " + playerPoints + " a " + opponentPoints +
                                    ". Gana " + PlayerName(winner) + " (" + awardedPoints + " puntos).";
