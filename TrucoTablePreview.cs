@@ -136,17 +136,25 @@ namespace TrucoRDR2
 
         public void Start()
         {
-            Close();
+            bool newMatch = _match == null;
             _visible = true;
-            _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
-            _selectedCardIndex = 0;
+
+            if (newMatch)
+            {
+                _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
+                _selectedCardIndex = 0;
+            }
+
+            DisposeSprites();
             _textureRequestSent = false;
             _textureDictionaryLoaded = false;
             _textureRequestTimeUtc = DateTime.UtcNow;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _spritesCreated = false;
             UpdateHandLabels();
-            TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
+
+            if (newMatch)
+                TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
         }
 
         public void ContinueAfterResult()
@@ -172,7 +180,7 @@ namespace TrucoRDR2
         {
             _visible = false;
             DisposeSprites();
-            _match = null;
+            // Keep the match, score and current hand so reopening the table resumes play.
             _textureRequestSent = false;
             _spritesCreated = false;
             _textureDictionaryLoaded = false;
