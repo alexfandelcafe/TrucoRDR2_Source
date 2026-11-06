@@ -28,6 +28,8 @@ namespace TrucoRDR2
             }
         }
 
+        private const float DesignWidth = 1920.0f;
+        private const float DesignHeight = 1080.0f;
         private const string DefaultTextureDictionary = "trucor2_cards";
         private const Keys TogglePreviewKey = Keys.F7;
         private const int CardsShown = 3;
@@ -78,32 +80,32 @@ namespace TrucoRDR2
 
             _cardPositions = new[]
             {
-                new PointF(670.0f, CardTop),
-                new PointF(870.0f, CardTop),
-                new PointF(1070.0f, CardTop)
+                LayoutPoint(670.0f, CardTop),
+                LayoutPoint(870.0f, CardTop),
+                LayoutPoint(1070.0f, CardTop)
             };
 
             _header = new TextElement(
                 "TRUCO RDR2 - PRUEBA DE TEXTURAS",
-                new PointF(960.0f, 80.0f), 0.65f, Color.Wheat,
+                LayoutPoint(960.0f, 80.0f), LayoutTextScale(0.65f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
                 "F7: mostrar/ocultar    AV PAG: siguiente    RE PAG: anterior    ESC: cerrar",
-                new PointF(960.0f, 125.0f), 0.40f, Color.WhiteSmoke,
+                LayoutPoint(960.0f, 125.0f), LayoutTextScale(0.40f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _status = new TextElement(
                 "Esperando carga del diccionario...",
-                new PointF(960.0f, 1000.0f), 0.40f, Color.WhiteSmoke,
+                LayoutPoint(960.0f, 1000.0f), LayoutTextScale(0.40f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             for (int i = 0; i < CardsShown; i++)
             {
                 _cardLabels[i] = new TextElement(
                     _textureNames[i],
-                    new PointF(_cardPositions[i].X + CardWidth / 2.0f, 655.0f),
-                    0.42f, Color.WhiteSmoke, Alignment.Center, true, true);
+                    LayoutPoint(670.0f + i * 200.0f + CardWidth / 2.0f, 655.0f),
+                    LayoutTextScale(0.42f), Color.WhiteSmoke, Alignment.Center, true, true);
             }
 
             Tick += OnTick;
@@ -377,7 +379,7 @@ namespace TrucoRDR2
                 replacements[i] = new Sprite(
                     _textureDictionary,
                     visibleNames[i],
-                    new SizeF(CardWidth, CardHeight),
+                    LayoutSize(CardWidth, CardHeight),
                     _cardPositions[i]);
             }
 
@@ -466,6 +468,40 @@ namespace TrucoRDR2
                 result += "Alt+";
 
             return result + binding.Key;
+        }
+
+        private static float LayoutScale
+        {
+            get
+            {
+                float width = RDR2.UI.Screen.Width;
+                float height = RDR2.UI.Screen.Height;
+                if (width <= 0.0f || height <= 0.0f)
+                    return 1.0f;
+
+                return Math.Min(width / DesignWidth, height / DesignHeight);
+            }
+        }
+
+        private static PointF LayoutPoint(float x, float y)
+        {
+            float scale = LayoutScale;
+            float width = RDR2.UI.Screen.Width;
+            float height = RDR2.UI.Screen.Height;
+            float offsetX = (width - DesignWidth * scale) / 2.0f;
+            float offsetY = (height - DesignHeight * scale) / 2.0f;
+            return new PointF(offsetX + x * scale, offsetY + y * scale);
+        }
+
+        private static SizeF LayoutSize(float width, float height)
+        {
+            float scale = LayoutScale;
+            return new SizeF(width * scale, height * scale);
+        }
+
+        private static float LayoutTextScale(float value)
+        {
+            return value * LayoutScale;
         }
 
         private static KeyBinding ReadTableToggleBinding()
