@@ -183,6 +183,9 @@ namespace TrucoRDR2
             if (!_visible || _match == null)
                 return;
 
+            // All keyboard input belongs to the table while it is visible.
+            e.Handled = true;
+
             if (e.KeyCode == Keys.Escape)
             {
                 Close();
@@ -250,7 +253,10 @@ namespace TrucoRDR2
             TrucoRound round = _match.Round;
             if (!round.PendingResponder.HasValue ||
                 round.PendingResponder.Value != TrucoPlayer.Player)
+            {
+                e.Handled = true;
                 return;
+            }
 
             if (e.KeyCode == Keys.Q)
             {
@@ -462,8 +468,11 @@ namespace TrucoRDR2
                     return;
                 }
 
-                int threshold = _match.OpponentScore > _match.PlayerScore ? 23 : 25;
-                accepted = points >= threshold && round.PendingValue <= 5;
+                int threshold = round.PendingValue <= 2 ? 22 :
+                                round.PendingValue <= 5 ? 27 : 31;
+                if (_match.OpponentScore > _match.PlayerScore)
+                    threshold -= 2;
+                accepted = points >= threshold;
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
             else if (pending == TrucoCall.Flor || pending == TrucoCall.ContraFlor ||
@@ -655,7 +664,11 @@ namespace TrucoRDR2
                 else if (round.PendingCall == TrucoCall.RealEnvido)
                     response += " / F para Falta";
                 else if (round.PendingCall == TrucoCall.Truco || round.PendingCall == TrucoCall.Retruco)
+                {
                     response += " / T para subir";
+                    if (round.CardsPlayed == 0)
+                        response += " / E-R-F para cantar envido primero";
+                }
                 else if (round.PendingCall == TrucoCall.Flor)
                     response += " / C contra flor";
                 else if (round.PendingCall == TrucoCall.ContraFlor)
