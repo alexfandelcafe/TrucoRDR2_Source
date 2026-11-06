@@ -18,7 +18,7 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
 1. Colocá tu archivo aquí (si el nombre es distinto, ajustá el INI):
 
-   `RDR2/lml/TrucoRDR2/stream/trucor2_cards.ytd`
+   `D:\Red Dead Redemption 2\lml\TrucoRDR2\stream\trucor2_cards.ytd`
 
 2. Abrí `scripts/TrucoRDR2.ini` y confirmá que la sección contiene:
 
@@ -49,7 +49,7 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
 ## Probar dentro del juego
 
-- `F6`: mostrar u ocultar la vista de texturas.
+- `F7`: mostrar u ocultar la vista de texturas. F6 queda libre porque abre el modo foto de RDR2.
 - `Av Pág` (`PageDown`): avanzar una carta en el catálogo.
 - `Re Pág` (`PageUp`): retroceder una carta.
 - `Esc`: cerrar la vista.
