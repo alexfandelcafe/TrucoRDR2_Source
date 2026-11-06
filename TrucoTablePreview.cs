@@ -863,8 +863,16 @@ namespace TrucoRDR2
         {
             int weakestIndex = 0;
             int weakestPower = int.MaxValue;
+            int strongestIndex = 0;
+            int strongestPower = int.MinValue;
             int winningIndex = -1;
             int winningPower = int.MaxValue;
+            int tyingIndex = -1;
+            int tyingPower = int.MaxValue;
+
+            int pendingPower = round.PendingCard == null
+                ? int.MinValue
+                : TrucoRules.TrucoPower(round.PendingCard);
 
             for (int i = 0; i < cards.Count; i++)
             {
@@ -875,16 +883,83 @@ namespace TrucoRDR2
                     weakestIndex = i;
                 }
 
-                if (round.PendingCard != null && power > TrucoRules.TrucoPower(round.PendingCard) &&
-                    power < winningPower)
+                if (power > strongestPower)
                 {
-                    winningPower = power;
-                    winningIndex = i;
+                    strongestPower = power;
+                    strongestIndex = i;
+                }
+
+                if (round.PendingCard != null)
+                {
+                    if (power > pendingPower && power < winningPower)
+                    {
+                        winningPower = power;
+                        winningIndex = i;
+                    }
+                    else if (power == pendingPower && power < tyingPower)
+                    {
+                        tyingPower = power;
+                        tyingIndex = i;
+                    }
                 }
             }
 
-            // If responding to a card, spend the weakest card that wins; otherwise shed the weakest.
-            return winningIndex >= 0 ? winningIndex : weakestIndex;
+            if (round.PendingCard != null)
+            {
+                // A parda can secure the hand if the computer won the first trick,
+                // or if all three tricks are tied and the computer is mano.
+                bool tieWinsHand = WouldPardaWinHandForComputer(round);
+                if (tieWinsHand && tyingIndex >= 0)
+                    return tyingIndex;
+
+                // Spend the weakest card that beats the opposing card; otherwise shed the weakest.
+                return winningIndex >= 0 ? winningIndex : weakestIndex;
+            }
+
+            // If a third trick is required, play to win it unless a parda already
+            // awards the hand to the computer as mano.
+            if (MustWinNextTrick(round))
+                return strongestIndex;
+
+            // When leading a trick with the hand already favoured, preserve strong cards.
+            return weakestIndex;
+        }
+
+        private static bool WouldPardaWinHandForComputer(TrucoRound round)
+        {
+            if (round.Tricks.Count == 1)
+                return round.Tricks[0].Winner == TrucoPlayer.Opponent;
+
+            if (round.Tricks.Count == 2)
+            {
+                TrucoTrick first = round.Tricks[0];
+                TrucoTrick second = round.Tricks[1];
+
+                if (first.Winner == TrucoPlayer.Opponent)
+                    return true;
+
+                if (first.IsParda && second.IsParda && round.Mano == TrucoPlayer.Opponent)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool MustWinNextTrick(TrucoRound round)
+        {
+            if (round.Tricks.Count < 2)
+                return false;
+
+            TrucoTrick first = round.Tricks[0];
+            TrucoTrick second = round.Tricks[1];
+
+            if (first.Winner == TrucoPlayer.Player && second.Winner == TrucoPlayer.Opponent)
+                return true;
+
+            if (first.IsParda && second.IsParda && round.Mano != TrucoPlayer.Opponent)
+                return true;
+
+            return false;
         }
 
         private bool DrawDealingCard(int index)
