@@ -67,6 +67,9 @@ namespace TrucoRDR2
         private TrucoPlayer _pendingFirstPlayer;
         private bool _initialized;
         private bool _envidoResolved;
+        private int _envidoCallCount;
+        private bool _realEnvidoCalled;
+        private bool _faltaEnvidoCalled;
         private bool _florResolved;
         private bool _envidoClosed;
         private int _envidoBasePoints;
@@ -205,9 +208,11 @@ namespace TrucoRDR2
             if (!IsEnvidoCall(call)) return false;
 
             if (PendingCall == TrucoCall.Envido)
-                return call == TrucoCall.Envido || call == TrucoCall.RealEnvido || call == TrucoCall.FaltaEnvido;
+                return (call == TrucoCall.Envido && _envidoCallCount < 2) ||
+                       (call == TrucoCall.RealEnvido && !_realEnvidoCalled) ||
+                       (call == TrucoCall.FaltaEnvido && !_faltaEnvidoCalled);
             if (PendingCall == TrucoCall.RealEnvido)
-                return call == TrucoCall.FaltaEnvido;
+                return call == TrucoCall.FaltaEnvido && !_faltaEnvidoCalled;
             return false;
         }
 
@@ -238,6 +243,10 @@ namespace TrucoRDR2
             }
 
             int callValue = GetEnvidoCallValue(call);
+            if (call == TrucoCall.Envido) _envidoCallCount++;
+            if (call == TrucoCall.RealEnvido) _realEnvidoCalled = true;
+            if (call == TrucoCall.FaltaEnvido) _faltaEnvidoCalled = true;
+
             _envidoTotal = _envidoBasePoints + callValue;
             SetPending(call, player, OtherPlayer(player), _envidoTotal);
             LastAnnouncement = PlayerName(player) + " canta " + CallName(call) + ".";
