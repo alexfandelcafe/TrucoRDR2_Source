@@ -137,8 +137,8 @@ namespace TrucoRDR2
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
-                "E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO | Q QUIERO | N NO QUIERO | FLECHAS + ENTER",
-                LayoutPoint(960.0f, 112.0f), LayoutTextScale(0.34f), Color.WhiteSmoke,
+                "E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO | Q/N RESPONDER | DPAD + A/B",
+                LayoutPoint(960.0f, 112.0f), LayoutTextScale(0.31f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _scoreboard = new TextElement(
@@ -253,7 +253,7 @@ namespace TrucoRDR2
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
-            SaveMatchProgress();
+            _progressSavedForCurrentRound = false;
             TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
         }
 
@@ -276,7 +276,7 @@ namespace TrucoRDR2
             _dealAnimationActive = !_match.IsComplete;
             _playedCardAnimation = null;
             _spritesCreated = false;
-            _progressSavedForCurrentRound = _match.IsComplete;
+            _progressSavedForCurrentRound = true;
             _saveStatusMessage = null;
             DisposeSprites();
             UpdateHandLabels();
@@ -367,8 +367,9 @@ namespace TrucoRDR2
             if (!_match.Round.IsComplete)
                 return;
 
+            SaveMatchProgress();
             _match.StartNextRound();
-            _progressSavedForCurrentRound = false;
+            _progressSavedForCurrentRound = true;
             _selectedCardIndex = 0;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _dealAnimationStartUtc = DateTime.UtcNow;
@@ -377,7 +378,6 @@ namespace TrucoRDR2
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
-            SaveMatchProgress();
             TrucoAudio.Play(_soundEnabled, _match.IsComplete ? TrucoSound.Win : TrucoSound.Deal);
         }
 
@@ -1517,7 +1517,7 @@ namespace TrucoRDR2
                 return _saveStatusMessage;
 
             if (round.CurrentPlayer == TrucoPlayer.Player)
-                return "TU TURNO: flechas/DPAD + ENTER/A | E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO";
+                return "TU TURNO: FLECHAS/DPAD + ENTER/A | X ENVIDO | LB REAL | RB FALTA | Y TRUCO | L3 MAZO";
             return "Turno del rival...";
         }
 
