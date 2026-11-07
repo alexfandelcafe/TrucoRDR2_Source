@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\TrucoCard.cs" Link="Source\TrucoCard.cs" />
+    <Compile Include="..\TrucoRules.cs" Link="Source\TrucoRules.cs" />
+    <Compile Include="..\TrucoDeck.cs" Link="Source\TrucoDeck.cs" />
+    <Compile Include="..\TrucoRound.cs" Link="Source\TrucoRound.cs" />
+    <Compile Include="..\TrucoMatch.cs" Link="Source\TrucoMatch.cs" />
+    <Compile Include="..\TrucoAi.cs" Link="Source\TrucoAi.cs" />
+    <Compile Include="..\TrucoConfiguration.cs" Link="Source\TrucoConfiguration.cs" />
+    <Compile Include="..\TrucoMatchProgressStore.cs" Link="Source\TrucoMatchProgressStore.cs" />
+  </ItemGroup>
+</Project>

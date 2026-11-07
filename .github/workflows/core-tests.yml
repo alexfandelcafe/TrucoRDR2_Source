@@ -1,0 +1,23 @@
+name: TrucoRDR2 core tests
+
+on:
+  push:
+    branches: [main, fix/ambiguous-screen-reference]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  rules-and-persistence:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run rule and persistence tests
+        run: dotnet run --project tests/TrucoRDR2.Tests.csproj --configuration Release

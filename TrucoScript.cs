@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
@@ -10,18 +11,33 @@ using RDR2.UI;
 namespace TrucoRDR2
 {
     /// <summary>
-    /// First in-game build for verifying the custom YTD before wiring in the full game/table logic.
-    /// F6 toggles the preview. PageUp/PageDown browse the 40 card textures. Escape closes it.
+    /// Texture validation plus an early interactive hand prototype.
+    /// F7 toggles the texture viewer; Ctrl+F9 opens the mano a mano table against a basic strategic opponent.
     /// </summary>
     public sealed class TrucoScript : Script
     {
+        private struct KeyBinding
+        {
+            public readonly Keys Key;
+            public readonly Keys Modifiers;
+
+            public KeyBinding(Keys key, Keys modifiers)
+            {
+                Key = key;
+                Modifiers = modifiers;
+            }
+        }
+
         private const string DefaultTextureDictionary = "trucor2_cards";
+        private const Keys TogglePreviewKey = Keys.F7;
         private const int CardsShown = 3;
         private const float CardWidth = 180.0f;
         private const float CardHeight = 270.0f;
         private const float CardTop = 690.0f;
+        private const double MissingDictionaryGraceSeconds = 5.0;
 
         private readonly string _textureDictionary;
+        private readonly KeyBinding _tableToggleBinding;
         private readonly string[] _textureNames;
         private readonly PointF[] _cardPositions;
         private readonly Sprite[] _sprites = new Sprite[CardsShown];
@@ -29,57 +45,140 @@ namespace TrucoRDR2
         private readonly TextElement _header;
         private readonly TextElement _instructions;
         private readonly TextElement _status;
+        private readonly TrucoTablePreview _tablePreview;
+        private readonly string _diagnosticLogPath;
+        private readonly string _settingsIniPath;
+        private readonly string _matchSavePath;
 
         private bool _previewEnabled;
+        private bool _toggleKeyDown;
+        private bool _tableToggleKeyDown;
+        private bool _textureRequestSent;
+        private bool _spritesCreated;
         private int _firstCardIndex;
+        private DateTime _textureRequestTimeUtc;
+        private string _lastDiagnosticState;
 
         public TrucoScript()
         {
             Interval = 0;
             _textureDictionary = ReadTextureDictionarySetting();
+            _tableToggleBinding = ReadTableToggleBinding();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
+
+            string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (string.IsNullOrEmpty(scriptDirectory))
+                scriptDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+            _diagnosticLogPath = Path.Combine(scriptDirectory, "TrucoRDR2.log");
+            _settingsIniPath = Path.Combine(scriptDirectory, "TrucoRDR2.ini");
+            _matchSavePath = Path.Combine(scriptDirectory, "TrucoRDR2.save");
+
+            _tablePreview = new TrucoTablePreview(
+                _textureDictionary,
+                FormatKeyBinding(_tableToggleBinding),
+                ReadMatchTargetSetting(),
+                ReadFlorEnabledSetting(),
+                ReadSoundEnabledSetting(),
+                _matchSavePath,
+                SaveGameplaySettings);
 
             _cardPositions = new[]
             {
-                new PointF(670.0f, CardTop),
-                new PointF(870.0f, CardTop),
-                new PointF(1070.0f, CardTop)
+                LayoutPoint(670.0f, CardTop),
+                LayoutPoint(870.0f, CardTop),
+                LayoutPoint(1070.0f, CardTop)
             };
 
             _header = new TextElement(
                 "TRUCO RDR2 - PRUEBA DE TEXTURAS",
-                new PointF(960.0f, 80.0f), 0.65f, Color.Wheat,
+                LayoutPoint(960.0f, 80.0f), LayoutTextScale(0.65f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
-                "F6: mostrar/ocultar    AV PAG: siguiente    RE PAG: anterior    ESC: cerrar",
-                new PointF(960.0f, 125.0f), 0.40f, Color.WhiteSmoke,
+                "F7: mostrar/ocultar    AV PAG: siguiente    RE PAG: anterior    ESC: cerrar",
+                LayoutPoint(960.0f, 125.0f), LayoutTextScale(0.40f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _status = new TextElement(
                 "Esperando carga del diccionario...",
-                new PointF(960.0f, 1000.0f), 0.40f, Color.WhiteSmoke,
+                LayoutPoint(960.0f, 1000.0f), LayoutTextScale(0.40f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             for (int i = 0; i < CardsShown; i++)
             {
                 _cardLabels[i] = new TextElement(
-                    string.Empty,
-                    new PointF(_cardPositions[i].X + CardWidth / 2.0f, 655.0f),
-                    0.42f, Color.WhiteSmoke, Alignment.Center, true, true);
+                    _textureNames[i],
+                    LayoutPoint(670.0f + i * 200.0f + CardWidth / 2.0f, 655.0f),
+                    LayoutTextScale(0.42f), Color.WhiteSmoke, Alignment.Center, true, true);
             }
 
             Tick += OnTick;
             KeyDown += OnKeyDown;
+            KeyUp += OnKeyUp;
             Aborted += OnAborted;
+
+            WriteDiagnostic("Script iniciado. Diccionario configurado: '" + _textureDictionary + "'.");
+            WriteExpectedYtdPath(scriptDirectory);
         }
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.F6)
+            if (e.KeyCode == _tableToggleBinding.Key && e.Modifiers == _tableToggleBinding.Modifiers)
             {
-                SetPreviewEnabled(!_previewEnabled);
+                // Ignore repeated KeyDown events until the physical key is released.
+                if (!_tableToggleKeyDown)
+                {
+                    _tableToggleKeyDown = true;
+                    if (_tablePreview.IsVisible)
+                    {
+                        if (_tablePreview.IsRoundComplete)
+                        {
+                            _tablePreview.ContinueAfterResult();
+                            WriteDiagnostic("Se avanzó a la siguiente mano o se inició una nueva partida.");
+                        }
+                        else
+                        {
+                            _tablePreview.Close();
+                            WriteDiagnostic("Mesa de prueba cerrada.");
+                        }
+                    }
+                    else
+                    {
+                        if (_previewEnabled)
+                            SetPreviewEnabled(false);
+
+                        _tablePreview.Start();
+                        WriteDiagnostic("Mesa de prueba activada.");
+                    }
+                }
+
                 e.Handled = true;
+                return;
+            }
+
+            if (e.KeyCode == TogglePreviewKey)
+            {
+                // The F7 texture viewer and the Ctrl+F9 table prototype are mutually exclusive.
+                if (_tablePreview.IsVisible)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                // Ignore repeated KeyDown events until the physical key is released.
+                if (!_toggleKeyDown)
+                {
+                    _toggleKeyDown = true;
+                    SetPreviewEnabled(!_previewEnabled);
+                }
+                e.Handled = true;
+                return;
+            }
+
+            if (_tablePreview.IsVisible)
+            {
+                _tablePreview.HandleKeyDown(e);
                 return;
             }
 
@@ -89,13 +188,17 @@ namespace TrucoRDR2
             if (e.KeyCode == Keys.PageDown)
             {
                 _firstCardIndex = (_firstCardIndex + 1) % _textureNames.Length;
-                RebuildVisibleSprites();
+                UpdateVisibleCardLabels();
+                if (_spritesCreated)
+                    RebuildVisibleSprites();
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.PageUp)
             {
                 _firstCardIndex = (_firstCardIndex - 1 + _textureNames.Length) % _textureNames.Length;
-                RebuildVisibleSprites();
+                UpdateVisibleCardLabels();
+                if (_spritesCreated)
+                    RebuildVisibleSprites();
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Escape)
@@ -105,44 +208,223 @@ namespace TrucoRDR2
             }
         }
 
+        private void OnKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == _tableToggleBinding.Key && _tableToggleKeyDown)
+            {
+                _tableToggleKeyDown = false;
+                e.Handled = true;
+                return;
+            }
+
+            if (e.KeyCode == TogglePreviewKey)
+            {
+                _toggleKeyDown = false;
+                e.Handled = true;
+            }
+        }
+
         private void OnTick(object sender, EventArgs e)
         {
+            if (_tablePreview.IsVisible)
+            {
+                _tablePreview.Draw();
+                return;
+            }
+
             if (!_previewEnabled)
                 return;
 
-            _header.Draw();
-            _instructions.Draw();
-
-            bool dictionaryLoaded = false;
             try
             {
-                dictionaryLoaded = TXD.HAS_STREAMED_TEXTURE_DICT_LOADED(_textureDictionary);
+                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(3);
             }
             catch
             {
-                // Sprite.Draw() below also guards against a dictionary which is not loaded.
+                // Keep the texture viewer usable even if the renderer lacks this draw-order native.
             }
 
-            if (dictionaryLoaded)
+            DrawPreviewSurface();
+            DrawTextElement(_header);
+            DrawTextElement(_instructions);
+
+            bool dictionaryExists;
+            bool dictionaryLoaded;
+
+            try
             {
-                _status.Caption = "Diccionario cargado: " + _textureDictionary +
-                                  "  |  Mazo de truco: 40 texturas (sin 8 ni 9)";
+                // Request first. DOES_STREAMED_TEXTURE_DICT_EXIST can be false before the
+                // request is issued, so gating the request on that check prevents first-time loading.
+                if (!_textureRequestSent)
+                {
+                    _textureRequestSent = true;
+                    _textureRequestTimeUtc = DateTime.UtcNow;
+                    TXD.REQUEST_STREAMED_TEXTURE_DICT(_textureDictionary, false);
+                    WriteDiagnostic("REQUEST_STREAMED_TEXTURE_DICT enviado para '" + _textureDictionary + "'.");
+                }
+
+                dictionaryExists = TXD.DOES_STREAMED_TEXTURE_DICT_EXIST(_textureDictionary);
+                dictionaryLoaded = TXD.HAS_STREAMED_TEXTURE_DICT_LOADED(_textureDictionary);
+            }
+            catch (Exception ex)
+            {
+                string errorState = "ERROR|" + ex.GetType().FullName + "|" + ex.Message;
+                if (!string.Equals(_lastDiagnosticState, errorState, StringComparison.Ordinal))
+                {
+                    WriteDiagnostic("ERROR consultando/cargando el diccionario: " + ex);
+                    _lastDiagnosticState = errorState;
+                }
+
+                SetStatusCaption("Error de TXD (" + ex.GetType().Name + "). Ver scripts\\TrucoRDR2.log.");
+                DrawTextElement(_status);
+                DrawVisibleCardLabels();
+                return;
+            }
+
+            string diagnosticState = dictionaryLoaded
+                ? "LOADED"
+                : (dictionaryExists ? "EXISTS_NOT_LOADED" : "NOT_FOUND");
+
+            if (!string.Equals(_lastDiagnosticState, diagnosticState, StringComparison.Ordinal))
+            {
+                WriteDiagnostic(
+                    "Estado del diccionario: " + diagnosticState +
+                    " | DOES_STREAMED_TEXTURE_DICT_EXIST=" + dictionaryExists +
+                    " | HAS_STREAMED_TEXTURE_DICT_LOADED=" + dictionaryLoaded + ".");
+                _lastDiagnosticState = diagnosticState;
+            }
+
+            if (!dictionaryLoaded)
+            {
+                if (!dictionaryExists)
+                {
+                    double secondsSinceRequest = (DateTime.UtcNow - _textureRequestTimeUtc).TotalSeconds;
+                    if (secondsSinceRequest < MissingDictionaryGraceSeconds)
+                    {
+                        SetStatusCaption("Solicitando YTD: " + _textureDictionary + "...");
+                    }
+                    else
+                    {
+                        SetStatusCaption(
+                            "El juego no encuentra '" + _textureDictionary +
+                            "'. Revisa ruta, nombre y formato del YTD.");
+                    }
+                }
+                else
+                {
+                    SetStatusCaption("Diccionario encontrado; esperando carga: " + _textureDictionary);
+                }
             }
             else
             {
-                _status.Caption = "Esperando YTD: " + _textureDictionary +
-                                  "  |  Comprueba LML y el nombre del diccionario.";
+                SetStatusCaption("Diccionario cargado: " + _textureDictionary +
+                                 "  |  40 cartas esperadas.");
+                if (!_spritesCreated)
+                {
+                    RebuildVisibleSprites();
+                    _spritesCreated = true;
+                    WriteDiagnostic("Diccionario cargado; sprites de vista previa creados.");
+                }
             }
 
-            _status.Draw();
+            DrawTextElement(_status);
 
             for (int i = 0; i < CardsShown; i++)
             {
-                if (_sprites[i] != null)
+                if (_spritesCreated && dictionaryLoaded && _sprites[i] != null)
                     _sprites[i].Draw();
 
-                _cardLabels[i].Draw();
+                // Keep texture names visible even when the YTD is missing or not loaded.
+                DrawTextElement(_cardLabels[i]);
             }
+        }
+
+        private void DrawVisibleCardLabels()
+        {
+            for (int i = 0; i < CardsShown; i++)
+                DrawTextElement(_cardLabels[i]);
+        }
+
+        private void DrawPreviewSurface()
+        {
+            DrawUiRect(960.0f, 105.0f, 1420.0f, 110.0f, 24, 19, 15, 225);
+            DrawUiRect(960.0f, 105.0f, 1410.0f, 100.0f, 46, 35, 24, 238);
+
+            // Texture labels and load status are intentionally unboxed, matching the game's HUD text style.
+        }
+
+        private static void DrawUiRect(float x, float y, float width, float height,
+            int red, int green, int blue, int alpha)
+        {
+            PointF center = LayoutPoint(x, y);
+            SizeF size = LayoutSize(width, height);
+            GRAPHICS.DRAW_RECT(
+                center.X / RDR2.UI.Screen.Width,
+                center.Y / RDR2.UI.Screen.Height,
+                size.Width / RDR2.UI.Screen.Width,
+                size.Height / RDR2.UI.Screen.Height,
+                red, green, blue, alpha, false, false);
+        }
+
+        private void DrawTextElement(TextElement element)
+        {
+            if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
+                return;
+
+            // TextElement's implementation ignores Alignment, so center/right aligned elements
+            // must be shifted manually before calling its left-anchored Draw().
+            PointF originalPosition = element.Position;
+            float textWidth = EstimateTextWidth(element.Caption, element.Scale);
+            float x = originalPosition.X;
+            if (element.Alignment == Alignment.Center)
+                x -= textWidth * 0.5f;
+            else if (element.Alignment == Alignment.Right)
+                x -= textWidth;
+
+            element.Position = new PointF(x, originalPosition.Y);
+            try
+            {
+                element.Draw();
+            }
+            finally
+            {
+                element.Position = originalPosition;
+            }
+        }
+
+        private static float EstimateTextWidth(string caption, float scale)
+        {
+            float maxUnits = 0.0f;
+            string[] lines = (caption ?? string.Empty).Split('\n');
+            foreach (string line in lines)
+            {
+                float units = 0.0f;
+                foreach (char ch in line)
+                {
+                    if (char.IsWhiteSpace(ch))
+                        units += 0.32f;
+                    else if (char.IsUpper(ch))
+                        units += 0.60f;
+                    else if (char.IsDigit(ch))
+                        units += 0.52f;
+                    else if (char.IsPunctuation(ch))
+                        units += 0.30f;
+                    else
+                        units += 0.49f;
+                }
+
+                if (units > maxUnits)
+                    maxUnits = units;
+            }
+
+            return maxUnits * scale * 70.0f;
+        }
+
+        private void SetStatusCaption(string caption)
+        {
+            // Avoid resetting the text element every frame while the load state is unchanged.
+            if (!string.Equals(_status.Caption, caption, StringComparison.Ordinal))
+                _status.Caption = caption;
         }
 
         private void SetPreviewEnabled(bool enabled)
@@ -154,13 +436,22 @@ namespace TrucoRDR2
             if (_previewEnabled)
             {
                 _firstCardIndex = 0;
-                RebuildVisibleSprites();
-                Screen.PrintSubtitle("TrucoRDR2: vista de texturas activada. Av Pag/Re Pag cambia las cartas.");
+                UpdateVisibleCardLabels();
+                _textureRequestSent = false;
+                _textureRequestTimeUtc = DateTime.UtcNow;
+                _lastDiagnosticState = null;
+                _spritesCreated = false;
+                WriteDiagnostic("Vista de texturas activada.");
+                RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas activada. Av Pag/Re Pag cambia las cartas.");
             }
             else
             {
                 DisposeSprites();
-                Screen.PrintSubtitle("TrucoRDR2: vista de texturas cerrada.");
+                _spritesCreated = false;
+                _textureRequestSent = false;
+                _lastDiagnosticState = null;
+                WriteDiagnostic("Vista de texturas cerrada.");
+                RDR2.UI.Screen.PrintSubtitle("TrucoRDR2: vista de texturas cerrada.");
             }
         }
 
@@ -178,7 +469,7 @@ namespace TrucoRDR2
                 replacements[i] = new Sprite(
                     _textureDictionary,
                     visibleNames[i],
-                    new SizeF(CardWidth, CardHeight),
+                    LayoutSize(CardWidth, CardHeight),
                     _cardPositions[i]);
             }
 
@@ -189,6 +480,15 @@ namespace TrucoRDR2
 
                 _sprites[i] = replacements[i];
                 _cardLabels[i].Caption = visibleNames[i];
+            }
+        }
+
+        private void UpdateVisibleCardLabels()
+        {
+            for (int i = 0; i < CardsShown; i++)
+            {
+                int catalogIndex = (_firstCardIndex + i) % _textureNames.Length;
+                _cardLabels[i].Caption = _textureNames[catalogIndex];
             }
         }
 
@@ -206,8 +506,294 @@ namespace TrucoRDR2
 
         private void OnAborted(object sender, EventArgs e)
         {
+            _tablePreview.Close();
             _previewEnabled = false;
             DisposeSprites();
+            WriteDiagnostic("Script abortado; sprites liberados.");
+        }
+
+        private void SaveGameplaySettings(int targetPoints, bool florEnabled, bool soundEnabled)
+        {
+            try
+            {
+                TrucoConfiguration.SaveGameplaySettings(
+                    _settingsIniPath, targetPoints, florEnabled, soundEnabled);
+                WriteDiagnostic("Opciones guardadas en TrucoRDR2.ini.");
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("No se pudieron guardar las opciones: " + ex);
+                throw;
+            }
+        }
+
+        private void WriteExpectedYtdPath(string scriptDirectory)
+        {
+            try
+            {
+                DirectoryInfo scriptsInfo = new DirectoryInfo(scriptDirectory);
+                DirectoryInfo gameRoot = scriptsInfo.Parent;
+                if (gameRoot == null)
+                    return;
+
+                string expectedYtdPath = Path.Combine(
+                    gameRoot.FullName, "lml", "stream", _textureDictionary + ".ytd");
+                WriteDiagnostic(
+                    "YTD esperado para LML: '" + expectedYtdPath +
+                    "' | existe en disco: " + File.Exists(expectedYtdPath) + ".");
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("No se pudo comprobar la ruta esperada del YTD: " + ex.Message);
+            }
+        }
+
+        private void WriteDiagnostic(string message)
+        {
+            try
+            {
+                string line = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture) +
+                              " " + message + Environment.NewLine;
+                File.AppendAllText(_diagnosticLogPath, line);
+            }
+            catch
+            {
+                // Diagnostics must never prevent the script from running.
+            }
+        }
+
+        private static string FormatKeyBinding(KeyBinding binding)
+        {
+            string result = string.Empty;
+            if ((binding.Modifiers & Keys.Control) != Keys.None)
+                result += "Ctrl+";
+            if ((binding.Modifiers & Keys.Shift) != Keys.None)
+                result += "Shift+";
+            if ((binding.Modifiers & Keys.Alt) != Keys.None)
+                result += "Alt+";
+
+            return result + binding.Key;
+        }
+
+        private static float LayoutScale
+        {
+            get
+            {
+                Size resolution = RDR2.UI.Screen.Resolution;
+                if (resolution.Width <= 0 || resolution.Height <= 0)
+                    return 1.0f;
+
+                return Math.Min(
+                    resolution.Width / RDR2.UI.Screen.Width,
+                    resolution.Height / RDR2.UI.Screen.Height);
+            }
+        }
+
+        private static PointF LayoutPoint(float x, float y)
+        {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return new PointF(x, y);
+
+            float scale = LayoutScale;
+            float offsetX = (resolution.Width - RDR2.UI.Screen.Width * scale) / 2.0f;
+            float offsetY = (resolution.Height - RDR2.UI.Screen.Height * scale) / 2.0f;
+            return new PointF(
+                (offsetX + x * scale) * RDR2.UI.Screen.Width / resolution.Width,
+                (offsetY + y * scale) * RDR2.UI.Screen.Height / resolution.Height);
+        }
+
+        private static SizeF LayoutSize(float width, float height)
+        {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return new SizeF(width, height);
+
+            float scale = LayoutScale;
+            return new SizeF(
+                width * scale * RDR2.UI.Screen.Width / resolution.Width,
+                height * scale * RDR2.UI.Screen.Height / resolution.Height);
+        }
+
+        private static float LayoutTextScale(float value)
+        {
+            Size resolution = RDR2.UI.Screen.Resolution;
+            if (resolution.Width <= 0 || resolution.Height <= 0)
+                return value;
+
+            // Text already scales with physical resolution; apply only the extra letterbox fit.
+            return value * LayoutScale * RDR2.UI.Screen.Height / resolution.Height;
+        }
+
+        private static KeyBinding ReadTableToggleBinding()
+        {
+            KeyBinding defaultBinding = new KeyBinding(Keys.F9, Keys.Control);
+
+            try
+            {
+                string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (string.IsNullOrEmpty(scriptDirectory))
+                    return defaultBinding;
+
+                string iniPath = Path.Combine(scriptDirectory, "TrucoRDR2.ini");
+                if (!File.Exists(iniPath))
+                    return defaultBinding;
+
+                string currentSection = string.Empty;
+                foreach (string rawLine in File.ReadAllLines(iniPath))
+                {
+                    string line = rawLine.Trim();
+                    if (line.Length == 0 || line.StartsWith(";") || line.StartsWith("#"))
+                        continue;
+
+                    if (line.StartsWith("[") && line.EndsWith("]"))
+                    {
+                        currentSection = line.Substring(1, line.Length - 2).Trim();
+                        continue;
+                    }
+
+                    if (!string.Equals(currentSection, "Controls", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    int equalsIndex = line.IndexOf('=');
+                    if (equalsIndex <= 0)
+                        continue;
+
+                    string key = line.Substring(0, equalsIndex).Trim();
+                    string value = line.Substring(equalsIndex + 1).Trim();
+                    if (string.Equals(key, "TableToggle", StringComparison.OrdinalIgnoreCase) && value.Length > 0)
+                        return ParseKeyBinding(value, defaultBinding);
+                }
+            }
+            catch
+            {
+                // A malformed optional control setting must not prevent the script from loading.
+            }
+
+            return defaultBinding;
+        }
+
+        private static KeyBinding ParseKeyBinding(string value, KeyBinding defaultBinding)
+        {
+            Keys key = Keys.None;
+            Keys modifiers = Keys.None;
+
+            string[] parts = value.Split('+');
+            foreach (string rawPart in parts)
+            {
+                string part = rawPart.Trim();
+                if (part.Length == 0)
+                    return defaultBinding;
+
+                if (string.Equals(part, "Ctrl", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(part, "Control", StringComparison.OrdinalIgnoreCase))
+                {
+                    modifiers |= Keys.Control;
+                }
+                else if (string.Equals(part, "Shift", StringComparison.OrdinalIgnoreCase))
+                {
+                    modifiers |= Keys.Shift;
+                }
+                else if (string.Equals(part, "Alt", StringComparison.OrdinalIgnoreCase))
+                {
+                    modifiers |= Keys.Alt;
+                }
+                else
+                {
+                    Keys parsedKey;
+                    if (key != Keys.None ||
+                        !Enum.TryParse(part, true, out parsedKey) ||
+                        !Enum.IsDefined(typeof(Keys), parsedKey) ||
+                        parsedKey == Keys.None ||
+                        (parsedKey & Keys.Modifiers) != Keys.None ||
+                        parsedKey == Keys.ControlKey ||
+                        parsedKey == Keys.ShiftKey ||
+                        parsedKey == Keys.Menu ||
+                        parsedKey == Keys.F7 ||
+                        parsedKey == Keys.F8 ||
+                        parsedKey == Keys.F6 ||
+                        parsedKey == Keys.Insert)
+                    {
+                        return defaultBinding;
+                    }
+
+                    key = parsedKey;
+                }
+            }
+
+            return key == Keys.None
+                ? defaultBinding
+                : new KeyBinding(key, modifiers);
+        }
+
+        private static int ReadMatchTargetSetting()
+        {
+            int value;
+            string raw = ReadIniSetting("Game", "TargetPoints");
+            if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value) &&
+                (value == 15 || value == 30))
+                return value;
+
+            return 30;
+        }
+
+        private static bool ReadFlorEnabledSetting()
+        {
+            bool value;
+            string raw = ReadIniSetting("Game", "FlorEnabled");
+            return bool.TryParse(raw, out value) ? value : false;
+        }
+
+        private static bool ReadSoundEnabledSetting()
+        {
+            bool value;
+            string raw = ReadIniSetting("Audio", "Enabled");
+            return bool.TryParse(raw, out value) ? value : true;
+        }
+
+        private static string ReadIniSetting(string sectionName, string settingName)
+        {
+            try
+            {
+                string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (string.IsNullOrEmpty(scriptDirectory))
+                    return null;
+
+                string iniPath = Path.Combine(scriptDirectory, "TrucoRDR2.ini");
+                if (!File.Exists(iniPath))
+                    return null;
+
+                string currentSection = string.Empty;
+                foreach (string rawLine in File.ReadAllLines(iniPath))
+                {
+                    string line = rawLine.Trim();
+                    if (line.Length == 0 || line.StartsWith(";") || line.StartsWith("#"))
+                        continue;
+
+                    if (line.StartsWith("[") && line.EndsWith("]"))
+                    {
+                        currentSection = line.Substring(1, line.Length - 2).Trim();
+                        continue;
+                    }
+
+                    if (!string.Equals(currentSection, sectionName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    int equalsIndex = line.IndexOf('=');
+                    if (equalsIndex <= 0)
+                        continue;
+
+                    string key = line.Substring(0, equalsIndex).Trim();
+                    if (string.Equals(key, settingName, StringComparison.OrdinalIgnoreCase))
+                        return line.Substring(equalsIndex + 1).Trim();
+                }
+            }
+            catch
+            {
+                // Optional settings always fall back to safe defaults.
+            }
+
+            return null;
         }
 
         private static string ReadTextureDictionarySetting()
