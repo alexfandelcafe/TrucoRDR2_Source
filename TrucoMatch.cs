@@ -11,6 +11,7 @@ namespace TrucoRDR2
         public int TargetPoints { get; private set; }
         public int PlayerScore { get; private set; }
         public int OpponentScore { get; private set; }
+        public bool FlorEnabled { get { return _florEnabled; } }
         public TrucoPlayer Mano { get; private set; }
         public TrucoRound Round { get; private set; }
         public bool IsComplete { get; private set; }
@@ -18,16 +19,44 @@ namespace TrucoRDR2
         public string LastScoreEvent { get; private set; }
 
         public TrucoMatch(int targetPoints, bool florEnabled, Random random)
+            : this(targetPoints, florEnabled, random, 0, 0, TrucoPlayer.Player, false, null)
+        {
+        }
+
+        internal TrucoMatch(TrucoMatchProgress progress, Random random)
+            : this(
+                progress == null ? 0 : progress.TargetPoints,
+                progress != null && progress.FlorEnabled,
+                random,
+                progress == null ? 0 : progress.PlayerScore,
+                progress == null ? 0 : progress.OpponentScore,
+                progress == null ? TrucoPlayer.Player : progress.Mano,
+                progress != null && progress.IsComplete,
+                progress == null ? null : progress.Winner)
+        {
+        }
+
+        private TrucoMatch(int targetPoints, bool florEnabled, Random random,
+            int playerScore, int opponentScore, TrucoPlayer mano, bool isComplete, TrucoPlayer? winner)
         {
             if (targetPoints != 15 && targetPoints != 30)
                 throw new ArgumentOutOfRangeException("targetPoints");
             if (random == null) throw new ArgumentNullException("random");
+            if (playerScore < 0 || opponentScore < 0)
+                throw new ArgumentOutOfRangeException("playerScore");
+            if (isComplete && !winner.HasValue)
+                throw new ArgumentException("Una partida terminada debe tener ganador.", "winner");
 
             TargetPoints = targetPoints;
             _florEnabled = florEnabled;
             _random = random;
-            Mano = TrucoPlayer.Player;
+            PlayerScore = playerScore;
+            OpponentScore = opponentScore;
+            Mano = mano;
             StartRound();
+            IsComplete = isComplete;
+            Winner = winner;
+            LastScoreEvent = isComplete ? "Partida restaurada: resultado final." : "Partida restaurada desde el último cierre de mano.";
         }
 
         public void StartNextRound()
