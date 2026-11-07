@@ -43,6 +43,10 @@ namespace TrucoRDR2
             }
             if (winner.HasValue && !Enum.IsDefined(typeof(TrucoPlayer), winner.Value))
                 throw new ArgumentOutOfRangeException("winner");
+            if (!isComplete && winner.HasValue)
+                throw new ArgumentException("Una partida incompleta no puede tener ganador.", "winner");
+            if (isComplete && playerScore >= targetPoints && opponentScore >= targetPoints)
+                throw new ArgumentException("El guardado tiene dos ganadores.", "winner");
 
             TargetPoints = targetPoints;
             PlayerScore = playerScore;
