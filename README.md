@@ -33,7 +33,7 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
 
    La combinación para abrir la mesa se configura en la sección `[Controls]` del mismo archivo INI; el valor predeterminado es `Control+F9`.
 
-3. Las cartas deben tener estos nombres de textura, sin `.png`: `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. El catálogo usa rangos `01`–`07` y `10`–`12` y omite 8 y 9, que no se usan en el truco argentino.
+3. Las caras de las 40 cartas deben tener estos nombres de textura, sin `.png`: `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. El catálogo usa rangos `01`–`07` y `10`–`12` y omite 8 y 9, que no se usan en el truco argentino. Además, incluí la textura `reverso` (sin extensión), que el mod usa para el dorso de las cartas ocultas del rival.
 
    Si generaste el YTD con RDR2 Texture ToolKit, usá el archivo de salida que termina en `_nya.ytd`; renombrá esa variante a `trucor2_cards.ytd`. El ToolKit también puede generar otro `.ytd` auxiliar que no es el destinado a RDR2.
 
@@ -133,7 +133,7 @@ El rival ya no juega cartas al azar. Evalúa su envido, la fuerza de su mano, la
 
 ### Interfaz y presentación
 
-La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa paneles de estilo madera y paño verde, reversos de cartas dibujados por el mod, resaltado de la carta seleccionada y animaciones básicas al repartir y jugar. Los efectos son sonidos del HUD que ya incluye RDR2. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; la escala final se ajustará según las pruebas en el juego.
+La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa paneles de estilo madera y paño verde, la textura `reverso` del YTD para las cartas ocultas, placas para las etiquetas y la selección resaltada. El texto se dibuja al final de la capa de interfaz para mantenerlo visible por encima de las cartas. Los efectos son sonidos del HUD que ya incluye RDR2. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; la escala final se ajustará según las pruebas en el juego.
 
 ## Integración y comportamiento
 
