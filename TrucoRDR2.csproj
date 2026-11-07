@@ -58,6 +58,9 @@
     <Compile Include="TrucoTablePreview.cs" />
     <Compile Include="TrucoMatch.cs" />
     <Compile Include="TrucoAudio.cs" />
+    <Compile Include="TrucoAi.cs" />
+    <Compile Include="TrucoConfiguration.cs" />
+    <Compile Include="TrucoMatchProgressStore.cs" />
   </ItemGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
