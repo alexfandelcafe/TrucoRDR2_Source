@@ -364,9 +364,9 @@ namespace TrucoRDR2
             if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            // ScriptHookRDR2DotNet V2's TextElement.Draw uses UIDEBUG._BG_DISPLAY_TEXT,
-            // which is known to flicker in-game. Use the regular HUD text path instead.
-            // Keep this local: mutating/restoring element.Position every frame is unnecessary.
+            // TextElement.Draw() uses UIDEBUG's debug-text path, which can flicker.
+            // Invoke the supported RDR2 HUD natives by hash because this ScriptHookRDR2DotNet
+            // build does not expose all of them as HUD methods.
             PointF position = element.Position;
             float textWidth = EstimateTextWidth(element.Caption, element.Scale);
             float x = position.X;
@@ -380,18 +380,14 @@ namespace TrucoRDR2
             if (screenWidth <= 0.0f || screenHeight <= 0.0f)
                 return;
 
-            HUD.SET_TEXT_FONT(0);
-            HUD.SET_TEXT_SCALE(element.Scale, element.Scale);
+            Function.Call(0x4170B650590B3B00UL, element.Scale, element.Scale); // SET_TEXT_SCALE
+            Function.Call(0xBE5261939FBECB8CUL, false); // SET_TEXT_CENTRE
             HUD._SET_TEXT_COLOR(element.Color.R, element.Color.G, element.Color.B, element.Color.A);
-            HUD.SET_TEXT_CENTRE(false);
 
             if (element.Shadow)
-                HUD.SET_TEXT_DROPSHADOW(1, 0, 0, 0, 180);
+                Function.Call(0x1BE39DBAA7263CA5UL, 1, 0, 0, 0, 180); // SET_TEXT_DROPSHADOW
             else
-                HUD.SET_TEXT_DROPSHADOW(0, 0, 0, 0, 0);
-
-            if (element.Outline)
-                HUD.SET_TEXT_OUTLINE();
+                Function.Call(0x1BE39DBAA7263CA5UL, 0, 0, 0, 0, 0);
 
             string renderedText = MISC.VAR_STRING(10, "LITERAL_STRING", element.Caption);
             HUD._DISPLAY_TEXT(renderedText, x / screenWidth, position.Y / screenHeight);
