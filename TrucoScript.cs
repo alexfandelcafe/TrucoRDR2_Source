@@ -230,7 +230,7 @@ namespace TrucoRDR2
 
             try
             {
-                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
+                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(3);
             }
             catch
             {
@@ -369,11 +369,56 @@ namespace TrucoRDR2
 
         private static void DrawTextElement(TextElement element)
         {
-            if (element == null)
+            if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
-            element.Draw();
+            // TextElement's implementation ignores Alignment, so center/right aligned elements
+            // must be shifted manually before calling its left-anchored Draw().
+            PointF originalPosition = element.Position;
+            float textWidth = EstimateTextWidth(element.Caption, element.Scale);
+            float x = originalPosition.X;
+            if (element.Alignment == Alignment.Center)
+                x -= textWidth * 0.5f;
+            else if (element.Alignment == Alignment.Right)
+                x -= textWidth;
+
+            element.Position = new PointF(x, originalPosition.Y);
+            try
+            {
+                element.Draw();
+            }
+            finally
+            {
+                element.Position = originalPosition;
+            }
+        }
+
+        private static float EstimateTextWidth(string caption, float scale)
+        {
+            float maxUnits = 0.0f;
+            string[] lines = (caption ?? string.Empty).Split('\n');
+            foreach (string line in lines)
+            {
+                float units = 0.0f;
+                foreach (char ch in line)
+                {
+                    if (char.IsWhiteSpace(ch))
+                        units += 0.32f;
+                    else if (char.IsUpper(ch))
+                        units += 0.60f;
+                    else if (char.IsDigit(ch))
+                        units += 0.52f;
+                    else if (char.IsPunctuation(ch))
+                        units += 0.30f;
+                    else
+                        units += 0.49f;
+                }
+
+                if (units > maxUnits)
+                    maxUnits = units;
+            }
+
+            return maxUnits * scale * 70.0f;
         }
 
         private void SetStatusCaption(string caption)
