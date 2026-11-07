@@ -235,6 +235,7 @@ namespace TrucoRDR2
 
         private void StartMatch()
         {
+            _saveStatusMessage = null;
             try
             {
                 TrucoMatchProgressStore.Delete(_matchSavePath);
@@ -248,7 +249,6 @@ namespace TrucoRDR2
             _savedProgress = null;
             _hasSavedMatch = false;
             _progressSavedForCurrentRound = false;
-            _saveStatusMessage = null;
             _showMenu = false;
             SetHeaderForMenu(false);
             _selectedCardIndex = 0;
@@ -353,8 +353,10 @@ namespace TrucoRDR2
             options.Add((_menuSelection == offset + 3 ? "> " : "  ") + "SONIDO: " + sound);
 
             SetCaption(_menuOptions, string.Join("\n", options.ToArray()));
-            SetCaption(_menuHint,
-                "ARRIBA/ABAJO: elegir   IZQUIERDA/DERECHA: cambiar\nENTER/A: confirmar   ESC/B: cerrar");
+            string hint = "ARRIBA/ABAJO: elegir   IZQUIERDA/DERECHA: cambiar\nENTER/A: confirmar   ESC/B: cerrar";
+            if (!string.IsNullOrEmpty(_saveStatusMessage))
+                hint += "\n" + _saveStatusMessage;
+            SetCaption(_menuHint, hint);
         }
 
         public void ContinueAfterResult()
@@ -733,6 +735,9 @@ namespace TrucoRDR2
             if (_match == null)
                 return;
 
+            if ((_match.IsComplete || _match.Round.IsComplete) && !_progressSavedForCurrentRound)
+                SaveMatchProgress();
+
             DrawTopPanel();
             DrawTableSurface();
 
@@ -786,8 +791,7 @@ namespace TrucoRDR2
                 if (_opponentRevealSprites[i] != null)
                     _opponentRevealSprites[i].Draw();
 
-            // Add dark label plates first, then draw all text after card sprites so it cannot
-            // flicker underneath or be covered by a sprite rendered later in the frame.
+            // Draw all labels after card sprites so text cannot be covered by later sprites.
 
             for (int i = 0; i < _playedSprites.Length; i++)
             {
@@ -989,12 +993,15 @@ namespace TrucoRDR2
             else
             {
                 int envido = round.EnvidoFor(TrucoPlayer.Opponent);
-                if (round.CardsPlayed == 0 && round.CanCallEnvido(TrucoPlayer.Opponent) && envido >= 29)
+                if (round.CardsPlayed == 0 && round.CanCallEnvido(TrucoPlayer.Opponent))
                 {
-                    TrucoCall answer = envido >= 32 ? TrucoCall.RealEnvido : TrucoCall.Envido;
-                    round.CallEnvido(TrucoPlayer.Opponent, answer);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
+                    TrucoCall? answer = TrucoAi.ChooseEnvidoCall(
+                        envido, _match.OpponentScore, _match.PlayerScore, _match.TargetPoints);
+                    if (answer.HasValue && round.CallEnvido(TrucoPlayer.Opponent, answer.Value))
+                    {
+                        TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                        return;
+                    }
                 }
 
                 int strength = round.HandStrength(TrucoPlayer.Opponent);
