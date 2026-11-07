@@ -1540,25 +1540,37 @@ namespace TrucoRDR2
             if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            // TextElement's implementation ignores Alignment, so center/right aligned elements
-            // must be shifted manually before calling its left-anchored Draw().
-            PointF originalPosition = element.Position;
+            // ScriptHookRDR2DotNet V2's TextElement.Draw uses UIDEBUG._BG_DISPLAY_TEXT,
+            // which is known to flicker in-game. Use the regular HUD text path instead.
+            // Keep this local: mutating/restoring element.Position every frame is unnecessary.
+            PointF position = element.Position;
             float textWidth = EstimateTextWidth(element.Caption, element.Scale);
-            float x = originalPosition.X;
+            float x = position.X;
             if (element.Alignment == Alignment.Center)
                 x -= textWidth * 0.5f;
             else if (element.Alignment == Alignment.Right)
                 x -= textWidth;
 
-            element.Position = new PointF(x, originalPosition.Y);
-            try
-            {
-                element.Draw();
-            }
-            finally
-            {
-                element.Position = originalPosition;
-            }
+            float screenWidth = RDR2.UI.Screen.Width;
+            float screenHeight = RDR2.UI.Screen.Height;
+            if (screenWidth <= 0.0f || screenHeight <= 0.0f)
+                return;
+
+            HUD.SET_TEXT_FONT(0);
+            HUD.SET_TEXT_SCALE(element.Scale, element.Scale);
+            HUD._SET_TEXT_COLOR(element.Color.R, element.Color.G, element.Color.B, element.Color.A);
+            HUD.SET_TEXT_CENTRE(false);
+
+            if (element.Shadow)
+                HUD.SET_TEXT_DROPSHADOW(1, 0, 0, 0, 180);
+            else
+                HUD.SET_TEXT_DROPSHADOW(0, 0, 0, 0, 0);
+
+            if (element.Outline)
+                HUD.SET_TEXT_OUTLINE();
+
+            string renderedText = MISC.VAR_STRING(10, "LITERAL_STRING", element.Caption);
+            HUD._DISPLAY_TEXT(renderedText, x / screenWidth, position.Y / screenHeight);
         }
 
         private static float EstimateTextWidth(string caption, float scale)
