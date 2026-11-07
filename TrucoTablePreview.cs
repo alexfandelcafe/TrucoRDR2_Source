@@ -146,7 +146,7 @@ namespace TrucoRDR2
 
             _announcement = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 257.0f), LayoutTextScale(0.36f), Color.Wheat,
+                LayoutPoint(960.0f, 252.0f), LayoutTextScale(0.34f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _handTitle = new TextElement(
