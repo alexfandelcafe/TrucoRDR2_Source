@@ -133,7 +133,9 @@ El rival ya no juega cartas al azar. Evalúa su envido, la fuerza de su mano, la
 
 ### Interfaz y presentación
 
-La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa paneles de estilo madera y paño verde, la textura `reverso` del YTD para las cartas ocultas, placas para las etiquetas y la selección resaltada. La alineación horizontal del texto se ajusta desde el mod porque la implementación de `TextElement` de ScriptHookRDR2DotNet guarda la alineación pero no la aplica al dibujar. Los efectos son sonidos del HUD que ya incluye RDR2.
+La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa un panel superior oscuro con acentos dorados, paño verde y marco de madera, la textura `reverso` del YTD para las cartas ocultas y selección resaltada. Las etiquetas de cartas, VOS/RIVAL, el título "TUS CARTAS" y el estado inferior no llevan placas de fondo. El texto se dibuja con los nativos HUD `_DISPLAY_TEXT` y `VAR_STRING`, usando las caras de fuente del juego `$title` y `$body`, en vez del renderizador de texto de depuración de `TextElement`. Los efectos son sonidos del HUD que ya incluye RDR2.
+
+La implementación de fuentes sigue el formato de texto enriquecido de RDR2 (`<FONT FACE='$title'>…</FONT>`) documentado en [RDR2Mods NativeDB](https://www.rdr2mods.com/nativedb/index/hud/_draw_text-r1623/) y en [el ejemplo de uso de fuentes nativas](https://www.rdr2mods.com/forums/topic/649-changing-draw_text-font/).
 
 **Nota sobre parpadeo del texto:** se ha reportado un problema conocido en ScriptHookRDR2DotNet V2 por el que `TextElement` puede parpadear aunque se dibuje cada frame; agregar fondos no lo corrige. La solución temporal reportada para ese framework es abrir su consola con `F8`, ejecutar `Help()` y cerrar la consola. No puedo confirmar que esa solución aplique a todas las versiones. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; la escala final se ajustará según las pruebas en el juego.
 
