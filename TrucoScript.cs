@@ -47,6 +47,8 @@ namespace TrucoRDR2
         private readonly TextElement _status;
         private readonly TrucoTablePreview _tablePreview;
         private readonly string _diagnosticLogPath;
+        private readonly string _settingsIniPath;
+        private readonly string _matchSavePath;
 
         private bool _previewEnabled;
         private bool _toggleKeyDown;
@@ -63,18 +65,23 @@ namespace TrucoRDR2
             _textureDictionary = ReadTextureDictionarySetting();
             _tableToggleBinding = ReadTableToggleBinding();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
-            _tablePreview = new TrucoTablePreview(
-                _textureDictionary,
-                FormatKeyBinding(_tableToggleBinding),
-                ReadMatchTargetSetting(),
-                ReadFlorEnabledSetting(),
-                ReadSoundEnabledSetting());
 
             string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(scriptDirectory))
                 scriptDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
             _diagnosticLogPath = Path.Combine(scriptDirectory, "TrucoRDR2.log");
+            _settingsIniPath = Path.Combine(scriptDirectory, "TrucoRDR2.ini");
+            _matchSavePath = Path.Combine(scriptDirectory, "TrucoRDR2.save");
+
+            _tablePreview = new TrucoTablePreview(
+                _textureDictionary,
+                FormatKeyBinding(_tableToggleBinding),
+                ReadMatchTargetSetting(),
+                ReadFlorEnabledSetting(),
+                ReadSoundEnabledSetting(),
+                _matchSavePath,
+                SaveGameplaySettings);
 
             _cardPositions = new[]
             {
@@ -503,6 +510,21 @@ namespace TrucoRDR2
             _previewEnabled = false;
             DisposeSprites();
             WriteDiagnostic("Script abortado; sprites liberados.");
+        }
+
+        private void SaveGameplaySettings(int targetPoints, bool florEnabled, bool soundEnabled)
+        {
+            try
+            {
+                TrucoConfiguration.SaveGameplaySettings(
+                    _settingsIniPath, targetPoints, florEnabled, soundEnabled);
+                WriteDiagnostic("Opciones guardadas en TrucoRDR2.ini.");
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("No se pudieron guardar las opciones: " + ex);
+                throw;
+            }
         }
 
         private void WriteExpectedYtdPath(string scriptDirectory)
