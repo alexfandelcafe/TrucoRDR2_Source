@@ -27,8 +27,22 @@ namespace TrucoRDR2
                 throw new ArgumentOutOfRangeException("targetPoints");
             if (playerScore < 0 || opponentScore < 0)
                 throw new ArgumentOutOfRangeException("playerScore");
-            if (isComplete && !winner.HasValue)
-                throw new ArgumentException("Una partida terminada debe tener ganador.", "winner");
+            if (!Enum.IsDefined(typeof(TrucoPlayer), mano))
+                throw new ArgumentOutOfRangeException("mano");
+            if (isComplete)
+            {
+                if (!winner.HasValue)
+                    throw new ArgumentException("Una partida terminada debe tener ganador.", "winner");
+                int winningScore = winner.Value == TrucoPlayer.Player ? playerScore : opponentScore;
+                if (winningScore < targetPoints)
+                    throw new ArgumentException("El ganador no alcanzó el objetivo de puntos.", "winner");
+            }
+            else if (playerScore >= targetPoints || opponentScore >= targetPoints)
+            {
+                throw new ArgumentException("Una partida incompleta no puede haber alcanzado el objetivo.", "playerScore");
+            }
+            if (winner.HasValue && !Enum.IsDefined(typeof(TrucoPlayer), winner.Value))
+                throw new ArgumentOutOfRangeException("winner");
 
             TargetPoints = targetPoints;
             PlayerScore = playerScore;
