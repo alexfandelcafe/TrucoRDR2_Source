@@ -133,11 +133,9 @@ El rival ya no juega cartas al azar. Evalúa su envido, la fuerza de su mano, la
 
 ### Interfaz y presentación
 
-La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa un panel superior oscuro con acentos dorados, paño verde y marco de madera, la textura `reverso` del YTD para las cartas ocultas y selección resaltada. Las etiquetas de cartas, VOS/RIVAL, el título "TUS CARTAS" y el estado inferior no llevan placas de fondo. El texto se dibuja con los nativos HUD `_DISPLAY_TEXT` y `VAR_STRING`, usando las caras de fuente del juego `$title` y `$body`, en vez del renderizador de texto de depuración de `TextElement`. Los efectos son sonidos del HUD que ya incluye RDR2.
+La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa un panel superior oscuro con acentos dorados, paño verde y marco de madera, la textura `reverso` del YTD para las cartas ocultas y selección resaltada. Las etiquetas de cartas, VOS/RIVAL, el título "TUS CARTAS" y el estado inferior no llevan placas de fondo. El texto usa el renderizador HUD estándar del juego para evitar el parpadeo observado en `RDR2.UI.TextElement.Draw()` de ScriptHookRDR2DotNet V2; mantiene los tamaños, colores, sombras, contornos y posiciones configurados en el código, sin seleccionar las caras de fuente personalizadas `$title` o `$body`. Los efectos son sonidos del HUD que ya incluye RDR2.
 
-La implementación de fuentes sigue el formato de texto enriquecido de RDR2 (`<FONT FACE='$title'>…</FONT>`) documentado en [RDR2Mods NativeDB](https://www.rdr2mods.com/nativedb/index/hud/_draw_text-r1623/) y en [el ejemplo de uso de fuentes nativas](https://www.rdr2mods.com/forums/topic/649-changing-draw_text-font/).
-
-El mod ya no usa `TextElement.Draw()` para pintar etiquetas: usa `HUD._DISPLAY_TEXT` y las etiquetas de fuentes integradas en el juego, con sombra de texto nativa. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; el tamaño final de fuente y la composición requieren prueba dentro del juego.
+La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; el tamaño y la composición final requieren prueba dentro del juego.
 
 ## Integración y comportamiento
 
