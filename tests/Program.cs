@@ -26,6 +26,7 @@ internal static class Program
         Run("Going to the deck before first card concedes two", FoldBeforeFirstCard);
         Run("Match alternates mano after a completed hand", MatchAlternatesMano);
         Run("AI raises its calls based on hand value", AiCallPolicy);
+        Run("AI chooses measured envido raises", AiEnvidoRaisePolicy);
         Run("AI changes risk thresholds with score", AiScorePolicy);
         Run("Settings writer preserves unrelated INI keys", SettingsPersistence);
         Run("Match checkpoint round-trips", MatchCheckpointRoundTrip);
@@ -238,6 +239,15 @@ internal static class Program
         Equal(TrucoCall.Envido, TrucoAi.ChooseEnvidoCall(29, 0, 0, 30).Value);
         Equal(TrucoCall.RealEnvido, TrucoAi.ChooseEnvidoCall(32, 0, 0, 30).Value);
         Equal(TrucoCall.FaltaEnvido, TrucoAi.ChooseEnvidoCall(32, 25, 20, 30).Value);
+    }
+
+    private static void AiEnvidoRaisePolicy()
+    {
+        Equal(TrucoCall.RealEnvido, TrucoAi.ChooseEnvidoRaise(31, TrucoCall.Envido, 0, 0, 30).Value);
+        Equal(TrucoCall.FaltaEnvido, TrucoAi.ChooseEnvidoRaise(32, TrucoCall.Envido, 26, 20, 30).Value);
+        Equal(TrucoCall.Envido, TrucoAi.ChooseEnvidoRaise(29, TrucoCall.Envido, 5, 12, 30).Value);
+        True(!TrucoAi.ChooseEnvidoRaise(25, TrucoCall.Envido, 0, 0, 30).HasValue,
+            "No debería subir con un envido bajo.");
     }
 
     private static void AiScorePolicy()
