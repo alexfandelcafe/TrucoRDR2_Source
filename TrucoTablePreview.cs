@@ -39,6 +39,8 @@ namespace TrucoRDR2
 
         private readonly string _textureDictionary;
         private readonly string _tableToggleText;
+        private readonly string _matchSavePath;
+        private readonly Action<int, bool, bool> _saveSettings;
         private int _targetPoints;
         private bool _florEnabled;
         private bool _soundEnabled;
@@ -79,6 +81,10 @@ namespace TrucoRDR2
         private bool _dealAnimationActive;
         private CardAnimation _playedCardAnimation;
         private int _lastObservedPlayerHealth;
+        private TrucoMatchProgress _savedProgress;
+        private bool _hasSavedMatch;
+        private bool _progressSavedForCurrentRound;
+        private string _saveStatusMessage;
 
         public bool IsVisible { get { return _visible; } }
         public bool IsRoundComplete
@@ -87,15 +93,21 @@ namespace TrucoRDR2
         }
 
         public TrucoTablePreview(string textureDictionary, string tableToggleText,
-            int targetPoints, bool florEnabled, bool soundEnabled)
+            int targetPoints, bool florEnabled, bool soundEnabled, string matchSavePath,
+            Action<int, bool, bool> saveSettings)
         {
             if (string.IsNullOrEmpty(textureDictionary))
                 throw new ArgumentException("El nombre del diccionario no puede estar vacío.", "textureDictionary");
             if (targetPoints != 15 && targetPoints != 30)
                 throw new ArgumentOutOfRangeException("targetPoints");
 
+            if (string.IsNullOrWhiteSpace(matchSavePath))
+                throw new ArgumentException("La ruta del guardado no puede estar vacía.", "matchSavePath");
+
             _textureDictionary = textureDictionary;
             _tableToggleText = string.IsNullOrEmpty(tableToggleText) ? "COMBINACION" : tableToggleText.ToUpperInvariant();
+            _matchSavePath = matchSavePath;
+            _saveSettings = saveSettings;
             _targetPoints = targetPoints;
             _florEnabled = florEnabled;
             _soundEnabled = soundEnabled;
@@ -194,6 +206,12 @@ namespace TrucoRDR2
 
             if (_match == null)
             {
+                _hasSavedMatch = TrucoMatchProgressStore.TryLoad(_matchSavePath, out _savedProgress);
+                if (_hasSavedMatch)
+                {
+                    _targetPoints = _savedProgress.TargetPoints;
+                    _florEnabled = _savedProgress.FlorEnabled;
+                }
                 _showMenu = true;
                 _menuSelection = 0;
                 UpdateMenuText();
@@ -218,6 +236,10 @@ namespace TrucoRDR2
         private void StartMatch()
         {
             _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
+            _savedProgress = null;
+            _hasSavedMatch = false;
+            _progressSavedForCurrentRound = false;
+            _saveStatusMessage = null;
             _showMenu = false;
             SetHeaderForMenu(false);
             _selectedCardIndex = 0;
@@ -231,7 +253,77 @@ namespace TrucoRDR2
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
+            SaveMatchProgress();
             TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
+        }
+
+        private void ContinueSavedMatch()
+        {
+            if (!_hasSavedMatch || _savedProgress == null)
+                return;
+
+            _targetPoints = _savedProgress.TargetPoints;
+            _florEnabled = _savedProgress.FlorEnabled;
+            _match = new TrucoMatch(_savedProgress, _random);
+            _showMenu = false;
+            SetHeaderForMenu(false);
+            _selectedCardIndex = 0;
+            _textureRequestSent = false;
+            _textureDictionaryLoaded = false;
+            _textureRequestTimeUtc = DateTime.UtcNow;
+            _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
+            _dealAnimationStartUtc = DateTime.UtcNow;
+            _dealAnimationActive = !_match.IsComplete;
+            _playedCardAnimation = null;
+            _spritesCreated = false;
+            _progressSavedForCurrentRound = _match.IsComplete;
+            _saveStatusMessage = null;
+            DisposeSprites();
+            UpdateHandLabels();
+            TrucoAudio.Play(_soundEnabled, _match.IsComplete ? TrucoSound.Win : TrucoSound.Deal);
+        }
+
+        private void SaveMatchProgress()
+        {
+            if (_match == null)
+                return;
+
+            try
+            {
+                TrucoPlayer savedMano = _match.Mano;
+                if (!_match.IsComplete && _match.Round != null && _match.Round.IsComplete)
+                    savedMano = savedMano == TrucoPlayer.Player ? TrucoPlayer.Opponent : TrucoPlayer.Player;
+
+                _savedProgress = new TrucoMatchProgress(
+                    _match.TargetPoints,
+                    _match.PlayerScore,
+                    _match.OpponentScore,
+                    savedMano,
+                    _match.FlorEnabled,
+                    _match.IsComplete,
+                    _match.Winner);
+                TrucoMatchProgressStore.Save(_matchSavePath, _savedProgress);
+                _hasSavedMatch = true;
+                _progressSavedForCurrentRound = true;
+                _saveStatusMessage = "Partida guardada al cierre de la mano.";
+            }
+            catch (Exception ex)
+            {
+                _saveStatusMessage = "No se pudo guardar la partida: " + ex.Message;
+            }
+        }
+
+        private void PersistMenuSettings()
+        {
+            try
+            {
+                if (_saveSettings != null)
+                    _saveSettings(_targetPoints, _florEnabled, _soundEnabled);
+            }
+            catch (Exception ex)
+            {
+                _saveStatusMessage = "No se pudieron guardar las opciones: " + ex.Message;
+            }
         }
 
         private void UpdateMenuText()
@@ -239,20 +331,20 @@ namespace TrucoRDR2
             string target = _targetPoints == 15 ? "15 PUNTOS" : "30 PUNTOS";
             string flor = _florEnabled ? "ACTIVADA" : "DESACTIVADA";
             string sound = _soundEnabled ? "ACTIVADO" : "DESACTIVADO";
+            int offset = _hasSavedMatch ? 1 : 0;
+            List<string> options = new List<string>();
 
-            string startPrefix = _menuSelection == 0 ? "> " : "  ";
-            string pointsPrefix = _menuSelection == 1 ? "> " : "  ";
-            string florPrefix = _menuSelection == 2 ? "> " : "  ";
-            string soundPrefix = _menuSelection == 3 ? "> " : "  ";
+            if (_hasSavedMatch)
+                options.Add((_menuSelection == 0 ? "> " : "  ") + "CONTINUAR PARTIDA");
 
-            SetCaption(_menuOptions,
-                startPrefix + "INICIAR PARTIDA\n" +
-                pointsPrefix + "DURACION: " + target + "\n" +
-                florPrefix + "FLOR: " + flor + "\n" +
-                soundPrefix + "SONIDO: " + sound);
+            options.Add((_menuSelection == offset ? "> " : "  ") + "NUEVA PARTIDA");
+            options.Add((_menuSelection == offset + 1 ? "> " : "  ") + "DURACION: " + target);
+            options.Add((_menuSelection == offset + 2 ? "> " : "  ") + "FLOR: " + flor);
+            options.Add((_menuSelection == offset + 3 ? "> " : "  ") + "SONIDO: " + sound);
 
+            SetCaption(_menuOptions, string.Join("\n", options.ToArray()));
             SetCaption(_menuHint,
-                "ARRIBA/ABAJO: elegir   IZQUIERDA/DERECHA: cambiar\nENTER: confirmar   ESC: cerrar");
+                "ARRIBA/ABAJO: elegir   IZQUIERDA/DERECHA: cambiar\nENTER/A: confirmar   ESC/B: cerrar");
         }
 
         public void ContinueAfterResult()
@@ -261,6 +353,7 @@ namespace TrucoRDR2
 
             if (_match.IsComplete)
             {
+                SaveMatchProgress();
                 _match = null;
                 _showMenu = true;
                 SetHeaderForMenu(true);
@@ -275,6 +368,7 @@ namespace TrucoRDR2
                 return;
 
             _match.StartNextRound();
+            _progressSavedForCurrentRound = false;
             _selectedCardIndex = 0;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _dealAnimationStartUtc = DateTime.UtcNow;
@@ -283,6 +377,7 @@ namespace TrucoRDR2
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
+            SaveMatchProgress();
             TrucoAudio.Play(_soundEnabled, _match.IsComplete ? TrucoSound.Win : TrucoSound.Deal);
         }
 
@@ -405,9 +500,12 @@ namespace TrucoRDR2
                 return;
             }
 
+            int selectionCount = _hasSavedMatch ? 5 : 4;
+            int offset = _hasSavedMatch ? 1 : 0;
+
             if (e.KeyCode == Keys.Up)
             {
-                _menuSelection = (_menuSelection - 1 + 4) % 4;
+                _menuSelection = (_menuSelection - 1 + selectionCount) % selectionCount;
                 UpdateMenuText();
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
                 return;
@@ -415,35 +513,51 @@ namespace TrucoRDR2
 
             if (e.KeyCode == Keys.Down)
             {
-                _menuSelection = (_menuSelection + 1) % 4;
+                _menuSelection = (_menuSelection + 1) % selectionCount;
                 UpdateMenuText();
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
                 return;
             }
 
-            if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Right || e.KeyCode == Keys.Enter)
-            {
-                if (_menuSelection == 0)
-                {
-                    if (e.KeyCode == Keys.Enter)
-                        StartMatch();
-                }
-                else if (_menuSelection == 1)
-                {
-                    _targetPoints = _targetPoints == 15 ? 30 : 15;
-                }
-                else if (_menuSelection == 2)
-                {
-                    _florEnabled = !_florEnabled;
-                }
-                else if (_menuSelection == 3)
-                {
-                    _soundEnabled = !_soundEnabled;
-                }
+            if (e.KeyCode != Keys.Left && e.KeyCode != Keys.Right && e.KeyCode != Keys.Enter)
+                return;
 
-                UpdateMenuText();
-                TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
+            if (_hasSavedMatch && _menuSelection == 0)
+            {
+                if (e.KeyCode == Keys.Enter)
+                    ContinueSavedMatch();
+                return;
             }
+
+            if (_menuSelection == offset)
+            {
+                if (e.KeyCode == Keys.Enter)
+                    StartMatch();
+                return;
+            }
+
+            bool changed = false;
+            if (_menuSelection == offset + 1)
+            {
+                _targetPoints = _targetPoints == 15 ? 30 : 15;
+                changed = true;
+            }
+            else if (_menuSelection == offset + 2)
+            {
+                _florEnabled = !_florEnabled;
+                changed = true;
+            }
+            else if (_menuSelection == offset + 3)
+            {
+                _soundEnabled = !_soundEnabled;
+                changed = true;
+            }
+
+            if (changed)
+                PersistMenuSettings();
+
+            UpdateMenuText();
+            TrucoAudio.Play(_soundEnabled, TrucoSound.Select);
         }
 
         private void HandlePendingResponse(KeyEventArgs e)
@@ -588,6 +702,9 @@ namespace TrucoRDR2
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(0);
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(1);
                 PAD.DISABLE_ALL_CONTROL_ACTIONS(2);
+                PollGamepadControls();
+                if (!_visible)
+                    return;
             }
             catch
             {
@@ -646,6 +763,9 @@ namespace TrucoRDR2
             }
 
             AdvanceComputer();
+
+            if ((_match.IsComplete || _match.Round.IsComplete) && !_progressSavedForCurrentRound)
+                SaveMatchProgress();
 
             if (!_spritesCreated)
                 RefreshSprites();
@@ -707,6 +827,51 @@ namespace TrucoRDR2
             DrawTextElement(_status);
         }
 
+        private void PollGamepadControls()
+        {
+            // Controls are disabled for the overlay, so query the disabled-control
+            // variant. A and B also answer pending calls (quiero / no quiero).
+            if (GamepadJustPressed(0x6319DB71UL)) HandleGamepadKey(Keys.Up);       // D-pad up
+            if (GamepadJustPressed(0x05CA7C52UL)) HandleGamepadKey(Keys.Down);     // D-pad down
+            if (GamepadJustPressed(0xA65EBAB4UL)) HandleGamepadKey(Keys.Left);     // D-pad left
+            if (GamepadJustPressed(0xDEB34313UL)) HandleGamepadKey(Keys.Right);    // D-pad right
+            if (GamepadJustPressed(0xC7B5340AUL)) HandleGamepadKey(Keys.Enter);    // A / accept
+            if (GamepadJustPressed(0x156F7119UL)) HandleGamepadKey(Keys.Escape);  // B / cancel
+            if (GamepadJustPressed(0x6DB8C62FUL)) HandleGamepadKey(Keys.E);       // X / envido
+            if (GamepadJustPressed(0x7C0162C0UL)) HandleGamepadKey(Keys.T);       // Y / truco
+            if (GamepadJustPressed(0xE885EF16UL)) HandleGamepadKey(Keys.R);       // LB / real envido
+            if (GamepadJustPressed(0x17BEC168UL)) HandleGamepadKey(Keys.F);       // RB / falta envido
+            if (GamepadJustPressed(0x51104035UL)) HandleGamepadKey(Keys.C);       // LT / contra flor
+            if (GamepadJustPressed(0x6FED71BCUL)) HandleGamepadKey(Keys.B);       // RT / contra flor al resto
+            if (GamepadJustPressed(0x43CDA5B0UL)) HandleGamepadKey(Keys.M);       // L3 / irse al mazo
+        }
+
+        private void HandleGamepadKey(Keys key)
+        {
+            if (!_visible)
+                return;
+
+            if (!_showMenu && _match != null && _match.Round.HasPendingResponse)
+            {
+                if (key == Keys.Enter) key = Keys.Q;
+                else if (key == Keys.Escape) key = Keys.N;
+            }
+
+            HandleKeyDown(new KeyEventArgs(key));
+        }
+
+        private static bool GamepadJustPressed(ulong control)
+        {
+            try
+            {
+                return Function.Call<bool>(0x91AEF906BCA88877UL, 0, unchecked((int)control));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private void AdvanceComputer()
         {
             if (_match.IsComplete || _match.Round.IsComplete ||
@@ -733,14 +898,8 @@ namespace TrucoRDR2
             int envido = round.EnvidoFor(TrucoPlayer.Opponent);
             if (round.CanCallEnvido(TrucoPlayer.Opponent))
             {
-                TrucoCall? envidoCall = null;
-                if (envido >= 32 && Math.Max(_match.PlayerScore, _match.OpponentScore) >= _match.TargetPoints - 5)
-                    envidoCall = TrucoCall.FaltaEnvido;
-                else if (envido >= 32)
-                    envidoCall = TrucoCall.RealEnvido;
-                else if (envido >= 29)
-                    envidoCall = TrucoCall.Envido;
-
+                TrucoCall? envidoCall = TrucoAi.ChooseEnvidoCall(
+                    envido, _match.OpponentScore, _match.PlayerScore, _match.TargetPoints);
                 if (envidoCall.HasValue && round.CallEnvido(TrucoPlayer.Opponent, envidoCall.Value))
                 {
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
@@ -749,16 +908,16 @@ namespace TrucoRDR2
             }
 
             int strength = round.HandStrength(TrucoPlayer.Opponent);
-            if (round.CanCallTruco(TrucoPlayer.Opponent) && strength >= 28)
+            if (round.CanCallTruco(TrucoPlayer.Opponent) &&
+                TrucoAi.ShouldCallTruco(strength, _match.OpponentScore, _match.PlayerScore, _match.TargetPoints))
             {
                 round.CallTruco(TrucoPlayer.Opponent);
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                 return;
             }
 
-            // With a very weak hand facing an accepted raise, the computer may concede
-            // instead of playing out a hand that is unlikely to recover.
-            if (round.TrucoStake >= 2 && strength <= 12 && _random.NextDouble() < 0.30)
+            if (TrucoAi.ShouldFold(strength, round.TrucoStake,
+                _match.OpponentScore, _match.PlayerScore, _match.TargetPoints))
             {
                 if (round.Fold(TrucoPlayer.Opponent))
                 {
@@ -782,67 +941,42 @@ namespace TrucoRDR2
             {
                 int points = round.EnvidoFor(TrucoPlayer.Opponent);
 
-                if (pending == TrucoCall.Envido && points >= 26 && _random.NextDouble() < 0.20 &&
-                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.Envido))
+                if (TrucoAi.ShouldRaiseEnvido(points, pending))
                 {
-                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.Envido);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
+                    TrucoCall raise = pending == TrucoCall.Envido && points >= 33
+                        ? TrucoCall.RealEnvido
+                        : TrucoCall.FaltaEnvido;
+                    if (round.CanRaiseEnvido(TrucoPlayer.Opponent, raise) &&
+                        round.CallEnvido(TrucoPlayer.Opponent, raise))
+                    {
+                        TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                        return;
+                    }
                 }
 
-                if (pending == TrucoCall.Envido && points >= 31 &&
-                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.RealEnvido))
-                {
-                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.RealEnvido);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
-                }
-
-                if ((pending == TrucoCall.Envido || pending == TrucoCall.RealEnvido) && points >= 32 &&
-                    Math.Max(_match.PlayerScore, _match.OpponentScore) >= _match.TargetPoints - 5 &&
-                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido))
-                {
-                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
-                }
-
-                if (pending == TrucoCall.RealEnvido && points >= 33 &&
-                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido))
-                {
-                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
-                }
-
-                int threshold = round.PendingValue <= 2 ? 22 :
-                                round.PendingValue <= 5 ? 27 : 31;
-                if (_match.OpponentScore > _match.PlayerScore)
-                    threshold -= 2;
-                accepted = points >= threshold;
+                accepted = TrucoAi.ShouldAcceptEnvido(
+                    points, round.PendingValue, _match.OpponentScore, _match.PlayerScore, _match.TargetPoints);
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
             else if (pending == TrucoCall.Flor || pending == TrucoCall.ContraFlor ||
                      pending == TrucoCall.ContraFlorAlResto)
             {
                 int flor = round.FlorFor(TrucoPlayer.Opponent);
-                if (pending == TrucoCall.Flor && flor >= 30 &&
-                    round.CanRaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlor))
+                if (TrucoAi.ShouldRaiseFlor(flor, pending))
                 {
-                    round.RaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlor);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
+                    TrucoCall raise = pending == TrucoCall.Flor
+                        ? TrucoCall.ContraFlor
+                        : TrucoCall.ContraFlorAlResto;
+                    if (round.CanRaiseFlor(TrucoPlayer.Opponent, raise) &&
+                        round.RaiseFlor(TrucoPlayer.Opponent, raise))
+                    {
+                        TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                        return;
+                    }
                 }
 
-                if (pending == TrucoCall.ContraFlor && flor >= 32 &&
-                    round.CanRaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlorAlResto))
-                {
-                    round.RaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlorAlResto);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
-                }
-
-                accepted = flor >= 28;
+                accepted = TrucoAi.ShouldAcceptFlor(
+                    flor, round.PendingValue, _match.OpponentScore, _match.PlayerScore, _match.TargetPoints);
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
             else
@@ -857,19 +991,17 @@ namespace TrucoRDR2
                 }
 
                 int strength = round.HandStrength(TrucoPlayer.Opponent);
-                int threshold = pending == TrucoCall.Truco ? 21 :
-                                pending == TrucoCall.Retruco ? 29 : 36;
-                if (_match.OpponentScore >= _match.TargetPoints - 3)
-                    threshold += 2;
-
                 if ((pending == TrucoCall.Truco || pending == TrucoCall.Retruco) &&
-                    strength >= 34 && round.RaiseTruco(TrucoPlayer.Opponent))
+                    TrucoAi.ShouldRaiseTruco(strength, _match.OpponentScore,
+                        _match.PlayerScore, _match.TargetPoints) &&
+                    round.RaiseTruco(TrucoPlayer.Opponent))
                 {
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                     return;
                 }
 
-                accepted = strength >= threshold;
+                accepted = TrucoAi.ShouldAcceptTruco(strength, pending,
+                    _match.OpponentScore, _match.PlayerScore, _match.TargetPoints);
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
 
@@ -927,71 +1059,10 @@ namespace TrucoRDR2
 
         private int ChooseComputerCard(TrucoRound round, IList<TrucoCard> cards)
         {
-            int weakestIndex = 0;
-            int weakestPower = int.MaxValue;
-            int strongestIndex = 0;
-            int strongestPower = int.MinValue;
-            int winningIndex = -1;
-            int winningPower = int.MaxValue;
-            int tyingIndex = -1;
-            int tyingPower = int.MaxValue;
-
-            int pendingPower = round.PendingCard == null
-                ? int.MinValue
-                : TrucoRules.TrucoPower(round.PendingCard);
-
-            for (int i = 0; i < cards.Count; i++)
-            {
-                int power = TrucoRules.TrucoPower(cards[i]);
-                if (power < weakestPower)
-                {
-                    weakestPower = power;
-                    weakestIndex = i;
-                }
-
-                if (power > strongestPower)
-                {
-                    strongestPower = power;
-                    strongestIndex = i;
-                }
-
-                if (round.PendingCard != null)
-                {
-                    if (power > pendingPower && power < winningPower)
-                    {
-                        winningPower = power;
-                        winningIndex = i;
-                    }
-                    else if (power == pendingPower && power < tyingPower)
-                    {
-                        tyingPower = power;
-                        tyingIndex = i;
-                    }
-                }
-            }
-
-            if (round.PendingCard != null)
-            {
-                // A parda can secure the hand if the computer won the first trick,
-                // or if all three tricks are tied and the computer is mano.
-                bool tieWinsHand = WouldPardaWinHandForComputer(round);
-                if (tieWinsHand && tyingIndex >= 0)
-                    return tyingIndex;
-
-                // Spend the weakest card that beats the opposing card; otherwise shed the weakest.
-                return winningIndex >= 0 ? winningIndex : weakestIndex;
-            }
-
-            // If a third trick is required, play to win it unless a parda already
-            // awards the hand to the computer as mano.
-            if (MustWinNextTrick(round))
-                return strongestIndex;
-
-            // When leading a trick with the hand already favoured, preserve strong cards.
-            return weakestIndex;
+            return TrucoAi.ChooseCard(round, cards);
         }
 
-        private static bool WouldPardaWinHandForComputer(TrucoRound round)
+                private static bool WouldPardaWinHandForComputer(TrucoRound round)
         {
             if (round.Tricks.Count == 1)
                 return round.Tricks[0].Winner == TrucoPlayer.Opponent;
@@ -1011,22 +1082,7 @@ namespace TrucoRDR2
             return false;
         }
 
-        private static bool MustWinNextTrick(TrucoRound round)
-        {
-            if (round.Tricks.Count < 2)
-                return false;
 
-            TrucoTrick first = round.Tricks[0];
-            TrucoTrick second = round.Tricks[1];
-
-            if (first.Winner == TrucoPlayer.Player && second.Winner == TrucoPlayer.Opponent)
-                return true;
-
-            if (first.IsParda && second.IsParda && round.Mano != TrucoPlayer.Opponent)
-                return true;
-
-            return false;
-        }
 
         private bool DrawDealingCard(int index)
         {
@@ -1457,8 +1513,11 @@ namespace TrucoRDR2
             if (round.HasPendingResponse)
                 return "Esperando respuesta del rival...";
 
+            if (!string.IsNullOrEmpty(_saveStatusMessage))
+                return _saveStatusMessage;
+
             if (round.CurrentPlayer == TrucoPlayer.Player)
-                return "TU TURNO: flechas + ENTER | E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO";
+                return "TU TURNO: flechas/DPAD + ENTER/A | E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO";
             return "Turno del rival...";
         }
 
