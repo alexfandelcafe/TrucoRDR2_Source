@@ -347,7 +347,8 @@ namespace TrucoRDR2
             List<string> options = new List<string>();
 
             if (_hasSavedMatch)
-                options.Add((_menuSelection == 0 ? "> " : "  ") + "CONTINUAR PARTIDA");
+                options.Add((_menuSelection == 0 ? "> " : "  ") +
+                    (_savedProgress != null && _savedProgress.IsComplete ? "VER RESULTADO" : "CONTINUAR PARTIDA"));
 
             options.Add((_menuSelection == offset ? "> " : "  ") + "NUEVA PARTIDA");
             options.Add((_menuSelection == offset + 1 ? "> " : "  ") + "DURACION: " + target);
@@ -809,6 +810,7 @@ namespace TrucoRDR2
                     _playedSprites[i].Draw();
             }
 
+            if (!_match.IsComplete)
             for (int i = 0; i < _handSprites.Length; i++)
             {
                 if (i == _selectedCardIndex && !_dealAnimationActive &&
@@ -829,15 +831,17 @@ namespace TrucoRDR2
             DrawTextElement(_roundInfo);
             DrawTextElement(_roundDetails);
             DrawTextElement(_announcement);
-            DrawTextElement(_handTitle);
-
-            for (int i = 0; i < _playedLabels.Length; i++)
-                DrawTextElement(_playedLabels[i]);
-
-            if (!_dealAnimationActive || DateTime.UtcNow >= _dealAnimationStartUtc.AddMilliseconds(650))
+            if (!_match.IsComplete)
             {
-                for (int i = 0; i < _handLabels.Length; i++)
-                    DrawTextElement(_handLabels[i]);
+                DrawTextElement(_handTitle);
+                for (int i = 0; i < _playedLabels.Length; i++)
+                    DrawTextElement(_playedLabels[i]);
+
+                if (!_dealAnimationActive || DateTime.UtcNow >= _dealAnimationStartUtc.AddMilliseconds(650))
+                {
+                    for (int i = 0; i < _handLabels.Length; i++)
+                        DrawTextElement(_handLabels[i]);
+                }
             }
 
             DrawTextElement(_status);
@@ -1546,7 +1550,7 @@ namespace TrucoRDR2
 
         private void UpdateHandLabels()
         {
-            IList<TrucoCard> cards = _match == null ? null : _match.Round.PlayerCards;
+            IList<TrucoCard> cards = _match == null || _match.IsComplete ? null : _match.Round.PlayerCards;
             for (int i = 0; i < _handLabels.Length; i++)
             {
                 string caption = string.Empty;
