@@ -243,6 +243,8 @@ namespace TrucoRDR2
             catch (Exception ex)
             {
                 _saveStatusMessage = "No se pudo quitar la partida anterior: " + ex.Message;
+                UpdateMenuText();
+                return;
             }
 
             _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
@@ -285,7 +287,7 @@ namespace TrucoRDR2
             _dealAnimationActive = !_match.IsComplete;
             _playedCardAnimation = null;
             _spritesCreated = false;
-            _progressSavedForCurrentRound = !_match.IsComplete;
+            _progressSavedForCurrentRound = false;
             _saveStatusMessage = null;
             DisposeSprites();
             UpdateHandLabels();
@@ -294,7 +296,7 @@ namespace TrucoRDR2
 
         private void SaveMatchProgress()
         {
-            if (_match == null)
+            if (_match == null || _progressSavedForCurrentRound)
                 return;
 
             try
@@ -381,7 +383,7 @@ namespace TrucoRDR2
 
             SaveMatchProgress();
             _match.StartNextRound();
-            _progressSavedForCurrentRound = !_match.IsComplete;
+            _progressSavedForCurrentRound = false;
             _selectedCardIndex = 0;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _dealAnimationStartUtc = DateTime.UtcNow;
