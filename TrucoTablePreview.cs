@@ -54,6 +54,7 @@ namespace TrucoRDR2
         private readonly TextElement _instructions;
         private readonly TextElement _scoreboard;
         private readonly TextElement _roundInfo;
+        private readonly TextElement _roundDetails;
         private readonly TextElement _announcement;
         private readonly TextElement _handTitle;
         private readonly TextElement _status;
@@ -135,12 +136,17 @@ namespace TrucoRDR2
 
             _roundInfo = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 210.0f), LayoutTextScale(0.39f), Color.WhiteSmoke,
+                LayoutPoint(960.0f, 198.0f), LayoutTextScale(0.36f), Color.WhiteSmoke,
+                Alignment.Center, true, true);
+
+            _roundDetails = new TextElement(
+                string.Empty,
+                LayoutPoint(960.0f, 225.0f), LayoutTextScale(0.36f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _announcement = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 250.0f), LayoutTextScale(0.43f), Color.Wheat,
+                LayoutPoint(960.0f, 257.0f), LayoutTextScale(0.36f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _handTitle = new TextElement(
@@ -246,7 +252,7 @@ namespace TrucoRDR2
                 soundPrefix + "SONIDO: " + sound);
 
             SetCaption(_menuHint,
-                "ARRIBA/ABAJO: elegir    IZQUIERDA/DERECHA: cambiar    ENTER: confirmar    ESC: cerrar");
+                "ARRIBA/ABAJO: elegir   IZQUIERDA/DERECHA: cambiar\nENTER: confirmar   ESC: cerrar");
         }
 
         public void ContinueAfterResult()
@@ -544,11 +550,11 @@ namespace TrucoRDR2
             if (!_visible)
                 return;
 
-            // Use the normal menu draw layer. Some ScriptHookRDR2DotNet builds otherwise
-            // leave TextElement output flickering or behind other 2D elements.
+            // Set the script graphics layer once per frame; changing it for each text element
+            // can interfere with other RDR2 UI layers.
             try
             {
-                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
+                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(3);
             }
             catch
             {
@@ -689,6 +695,7 @@ namespace TrucoRDR2
             DrawTextElement(_instructions);
             DrawTextElement(_scoreboard);
             DrawTextElement(_roundInfo);
+            DrawTextElement(_roundDetails);
             DrawTextElement(_announcement);
             DrawTextElement(_handTitle);
 
@@ -1440,9 +1447,11 @@ namespace TrucoRDR2
             string third = round.Tricks.Count > 2 ? FormatTrick(round.Tricks[2]) : "-";
             SetCaption(_roundInfo,
                 "MANO: " + (round.Mano == TrucoPlayer.Player ? "VOS" : "RIVAL") +
-                "    |    RIVAL: " + round.OpponentCards.Count + " restantes" +
-                "    |    BAZAS: " + first + " / " + second + " / " + third +
-                "    |    TRUCO: " + round.TrucoStake + " punto(s)" +
+                "    |    RIVAL: " + round.OpponentCards.Count + " cartas" +
+                "    |    BAZAS: " + first + " / " + second + " / " + third);
+
+            SetCaption(_roundDetails,
+                "TRUCO: " + round.TrucoStake + " punto(s)" +
                 "    |    FLOR: " + (_florEnabled ? "SI" : "NO"));
 
             string announcement = round.LastAnnouncement;
@@ -1568,6 +1577,7 @@ namespace TrucoRDR2
             DrawTextElement(_instructions);
             DrawTextElement(_scoreboard);
             DrawTextElement(_roundInfo);
+            DrawTextElement(_roundDetails);
             DrawTextElement(_announcement);
             DrawTextElement(_handTitle);
             for (int i = 0; i < _playedLabels.Length; i++)
@@ -1584,12 +1594,57 @@ namespace TrucoRDR2
 
         private static void DrawTextElement(TextElement element)
         {
-            if (element == null)
+            if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            // Force the expected UI layer before each TextElement draw.
-            GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
-            element.Draw();
+            // ScriptHookRDR2DotNet's TextElement stores Alignment but its Draw() implementation
+            // ignores it. Adjust the left-anchored position here, without modifying the element
+            // permanently, so headings and labels are actually centered.
+            PointF originalPosition = element.Position;
+            float textWidth = EstimateTextWidth(element.Caption, element.Scale);
+            float x = originalPosition.X;
+            if (element.Alignment == Alignment.Center)
+                x -= textWidth * 0.5f;
+            else if (element.Alignment == Alignment.Right)
+                x -= textWidth;
+
+            element.Position = new PointF(x, originalPosition.Y);
+            try
+            {
+                element.Draw();
+            }
+            finally
+            {
+                element.Position = originalPosition;
+            }
+        }
+
+        private static float EstimateTextWidth(string caption, float scale)
+        {
+            float maxUnits = 0.0f;
+            string[] lines = (caption ?? string.Empty).Split('\n');
+            foreach (string line in lines)
+            {
+                float units = 0.0f;
+                foreach (char ch in line)
+                {
+                    if (char.IsWhiteSpace(ch))
+                        units += 0.32f;
+                    else if (char.IsUpper(ch))
+                        units += 0.60f;
+                    else if (char.IsDigit(ch))
+                        units += 0.52f;
+                    else if (char.IsPunctuation(ch))
+                        units += 0.30f;
+                    else
+                        units += 0.49f;
+                }
+
+                if (units > maxUnits)
+                    maxUnits = units;
+            }
+
+            return maxUnits * scale * 70.0f;
         }
 
         private static string FormatTrick(TrucoTrick trick)
