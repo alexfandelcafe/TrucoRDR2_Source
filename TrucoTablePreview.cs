@@ -793,24 +793,25 @@ namespace TrucoRDR2
             {
                 DrawOpponentCardBacks();
                 for (int i = 0; i < _opponentRevealSprites.Length; i++)
+                {
                     if (_opponentRevealSprites[i] != null)
                         _opponentRevealSprites[i].Draw();
-
-                // Draw all labels after card sprites so text cannot be covered by later sprites.
-
-                for (int i = 0; i < _playedSprites.Length; i++)
-            {
-                if (_playedCardAnimation != null && _playedCardAnimation.Slot == i)
-                {
-                    if (DrawPlayedCardAnimation())
-                        continue;
-
-                    _playedCardAnimation = null;
                 }
 
-                if (_playedSprites[i] != null)
-                    _playedSprites[i].Draw();
-            }
+                // Draw labels after card sprites so text cannot be covered later in the frame.
+                for (int i = 0; i < _playedSprites.Length; i++)
+                {
+                    if (_playedCardAnimation != null && _playedCardAnimation.Slot == i)
+                    {
+                        if (DrawPlayedCardAnimation())
+                            continue;
+
+                        _playedCardAnimation = null;
+                    }
+
+                    if (_playedSprites[i] != null)
+                        _playedSprites[i].Draw();
+                }
 
                 for (int i = 0; i < _handSprites.Length; i++)
                 {
