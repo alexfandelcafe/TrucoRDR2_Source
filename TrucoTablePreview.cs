@@ -658,10 +658,6 @@ namespace TrucoRDR2
 
             // Add dark label plates first, then draw all text after card sprites so it cannot
             // flicker underneath or be covered by a sprite rendered later in the frame.
-            DrawHandTitleSurface();
-            DrawPlayedLabelSurfaces();
-            DrawHandLabelSurfaces();
-            DrawStatusSurface();
 
             for (int i = 0; i < _playedSprites.Length; i++)
             {
@@ -1234,48 +1230,6 @@ namespace TrucoRDR2
             DrawRect(center.X, center.Y, LayoutWidth(2.0f), LayoutHeight(165.0f), 151, 190, 128, 115);
         }
 
-        private void DrawHandTitleSurface()
-        {
-            PointF center = LayoutPoint(960.0f, 665.0f);
-            SizeF outer = LayoutSize(310.0f, 36.0f);
-            SizeF inner = LayoutSize(300.0f, 28.0f);
-            DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 225);
-            DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
-        }
-
-        private void DrawPlayedLabelSurfaces()
-        {
-            for (int i = 0; i < _playedLabels.Length; i++)
-            {
-                PointF center = _playedLabels[i].Position;
-                SizeF outer = LayoutSize(106.0f, 28.0f);
-                SizeF inner = LayoutSize(98.0f, 22.0f);
-                DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
-                DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
-            }
-        }
-
-        private void DrawHandLabelSurfaces()
-        {
-            for (int i = 0; i < _handLabels.Length; i++)
-            {
-                PointF center = _handLabels[i].Position;
-                SizeF outer = LayoutSize(212.0f, 31.0f);
-                SizeF inner = LayoutSize(204.0f, 25.0f);
-                DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
-                DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
-            }
-        }
-
-        private void DrawStatusSurface()
-        {
-            PointF center = LayoutPoint(960.0f, 1025.0f);
-            SizeF outer = LayoutSize(1500.0f, 48.0f);
-            SizeF inner = LayoutSize(1490.0f, 40.0f);
-            DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 225);
-            DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
-        }
-
         private void DrawSelectedCardFrame(int index)
         {
             if (index < 0 || index >= _handPositions.Length)
@@ -1308,9 +1262,7 @@ namespace TrucoRDR2
                 float centerX = position.X + cardSize.Width / 2.0f;
                 float centerY = position.Y + cardSize.Height / 2.0f;
 
-                // Keep a narrow frame behind the actual YTD back texture named "reverso".
-                DrawRect(centerX, centerY, cardSize.Width, cardSize.Height, 22, 20, 26, 245);
-                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(2.0f), cardSize.Height - LayoutHeight(2.0f), 202, 170, 100, 255);
+                // Draw only the supplied texture; no artificial frame or color plate.
                 if (_opponentBackSprites[i] != null)
                     _opponentBackSprites[i].Draw();
             }
@@ -1568,10 +1520,6 @@ namespace TrucoRDR2
         private void DrawTextOnly()
         {
             DrawOpponentCardBacks();
-            DrawHandTitleSurface();
-            DrawPlayedLabelSurfaces();
-            DrawHandLabelSurfaces();
-            DrawStatusSurface();
 
             DrawTextElement(_header);
             DrawTextElement(_instructions);
@@ -1592,31 +1540,46 @@ namespace TrucoRDR2
                 DrawTextElement(_handLabels[i]);
         }
 
-        private static void DrawTextElement(TextElement element)
+        private void DrawTextElement(TextElement element)
         {
             if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            // ScriptHookRDR2DotNet's TextElement stores Alignment but its Draw() implementation
-            // ignores it. Adjust the left-anchored position here, without modifying the element
-            // permanently, so headings and labels are actually centered.
-            PointF originalPosition = element.Position;
-            float textWidth = EstimateTextWidth(element.Caption, element.Scale);
-            float x = originalPosition.X;
-            if (element.Alignment == Alignment.Center)
-                x -= textWidth * 0.5f;
-            else if (element.Alignment == Alignment.Right)
-                x -= textWidth;
+            string face = (ReferenceEquals(element, _header) ||
+                           ReferenceEquals(element, _handTitle))
+                ? "$title"
+                : "$body";
+            DrawNativeText(element, face);
+        }
 
-            element.Position = new PointF(x, originalPosition.Y);
-            try
-            {
-                element.Draw();
-            }
-            finally
-            {
-                element.Position = originalPosition;
-            }
+        private static void DrawNativeText(TextElement element, string fontFace)
+        {
+            // Use RDR2's HUD text renderer and built-in font faces, rather than the
+            // ScriptHook TextElement debug-text path. Font tags are supported by _DISPLAY_TEXT.
+            string caption = (element.Caption ?? string.Empty)
+                .Replace("\r\n", "\n")
+                .Replace("\n", "~n~");
+            string color = "#" +
+                element.Color.R.ToString("X2") +
+                element.Color.G.ToString("X2") +
+                element.Color.B.ToString("X2");
+            string markup = "<FONT FACE='" + fontFace + "' COLOR='" + color + "'>" +
+                            caption + "</FONT>";
+            string literal = MISC.VAR_STRING(10, "LITERAL_STRING", markup);
+            string richText = MISC.VAR_STRING(42, "COLOR_STRING", 0, literal);
+
+            HUD.SET_TEXT_SCALE(element.Scale, element.Scale);
+            HUD.SET_TEXT_CENTRE(element.Alignment == Alignment.Center);
+            HUD.SET_TEXT_DROPSHADOW(1, 0, 0, 0, 180);
+
+            float x = element.Position.X;
+            if (element.Alignment == Alignment.Right)
+                x -= EstimateTextWidth(caption, element.Scale);
+
+            HUD._DISPLAY_TEXT(
+                richText,
+                x / RDR2.UI.Screen.Width,
+                element.Position.Y / RDR2.UI.Screen.Height);
         }
 
         private static float EstimateTextWidth(string caption, float scale)
