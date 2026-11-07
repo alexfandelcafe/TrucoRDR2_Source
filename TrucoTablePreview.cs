@@ -789,14 +789,16 @@ namespace TrucoRDR2
                 RefreshSprites();
 
             UpdateText();
-            DrawOpponentCardBacks();
-            for (int i = 0; i < _opponentRevealSprites.Length; i++)
-                if (_opponentRevealSprites[i] != null)
-                    _opponentRevealSprites[i].Draw();
+            if (!_match.IsComplete)
+            {
+                DrawOpponentCardBacks();
+                for (int i = 0; i < _opponentRevealSprites.Length; i++)
+                    if (_opponentRevealSprites[i] != null)
+                        _opponentRevealSprites[i].Draw();
 
-            // Draw all labels after card sprites so text cannot be covered by later sprites.
+                // Draw all labels after card sprites so text cannot be covered by later sprites.
 
-            for (int i = 0; i < _playedSprites.Length; i++)
+                for (int i = 0; i < _playedSprites.Length; i++)
             {
                 if (_playedCardAnimation != null && _playedCardAnimation.Slot == i)
                 {
@@ -810,18 +812,18 @@ namespace TrucoRDR2
                     _playedSprites[i].Draw();
             }
 
-            if (!_match.IsComplete)
-            for (int i = 0; i < _handSprites.Length; i++)
-            {
-                if (i == _selectedCardIndex && !_dealAnimationActive &&
-                    _match.Round.CurrentPlayer == TrucoPlayer.Player &&
-                    !_match.Round.IsComplete && !_match.Round.HasPendingResponse)
-                    DrawSelectedCardFrame(i);
-
-                if (_handSprites[i] != null)
+                for (int i = 0; i < _handSprites.Length; i++)
                 {
-                    if (!DrawDealingCard(i))
-                        _handSprites[i].Draw();
+                    if (i == _selectedCardIndex && !_dealAnimationActive &&
+                        _match.Round.CurrentPlayer == TrucoPlayer.Player &&
+                        !_match.Round.IsComplete && !_match.Round.HasPendingResponse)
+                        DrawSelectedCardFrame(i);
+
+                    if (_handSprites[i] != null)
+                    {
+                        if (!DrawDealingCard(i))
+                            _handSprites[i].Draw();
+                    }
                 }
             }
 
@@ -1512,7 +1514,7 @@ namespace TrucoRDR2
                     ? "por " + (round.PendingValue + 1) + " puntos (no querido: " + round.PendingValue + ")"
                     : (faltaCallsWholeMatch ? "por la partida" : round.PendingValue + " punto(s)");
                 string response = "RIVAL CANTA " + TrucoRound.CallName(round.PendingCall) +
-                                  " (" + offerValue + "). Q=QUIERO / N=NO QUIERO";
+                                  " (" + offerValue + "). Q/A=QUIERO / N/B=NO QUIERO";
                 if (round.PendingCall == TrucoCall.Envido)
                     response += " / E, R o F para subir";
                 else if (round.PendingCall == TrucoCall.RealEnvido)
