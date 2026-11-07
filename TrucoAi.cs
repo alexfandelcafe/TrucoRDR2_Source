@@ -78,13 +78,26 @@ namespace TrucoRDR2
             return florPoints >= threshold;
         }
 
-        public static bool ShouldRaiseEnvido(int points, TrucoCall pending)
+        public static TrucoCall? ChooseEnvidoRaise(int points, TrucoCall pending,
+            int ownScore, int otherScore, int targetPoints)
         {
+            bool matchIsClose = Math.Max(ownScore, otherScore) >= targetPoints - 5;
+
             if (pending == TrucoCall.Envido)
-                return points >= 31;
-            if (pending == TrucoCall.RealEnvido)
-                return points >= 33;
-            return false;
+            {
+                if (points >= 32 && matchIsClose)
+                    return TrucoCall.FaltaEnvido;
+                if (points >= 31)
+                    return TrucoCall.RealEnvido;
+                if (points >= 27 && ownScore + 3 < otherScore)
+                    return TrucoCall.Envido;
+            }
+            else if (pending == TrucoCall.RealEnvido && points >= 33)
+            {
+                return TrucoCall.FaltaEnvido;
+            }
+
+            return null;
         }
 
         public static bool ShouldRaiseFlor(int florPoints, TrucoCall pending)
