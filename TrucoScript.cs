@@ -343,15 +343,7 @@ namespace TrucoRDR2
             DrawUiRect(960.0f, 105.0f, 1420.0f, 110.0f, 24, 19, 15, 225);
             DrawUiRect(960.0f, 105.0f, 1410.0f, 100.0f, 46, 35, 24, 238);
 
-            for (int i = 0; i < CardsShown; i++)
-            {
-                float centerX = 760.0f + i * 200.0f;
-                DrawUiRect(centerX, 655.0f, 190.0f, 32.0f, 24, 19, 15, 235);
-                DrawUiRect(centerX, 655.0f, 182.0f, 25.0f, 46, 35, 24, 238);
-            }
-
-            DrawUiRect(960.0f, 1000.0f, 1500.0f, 50.0f, 24, 19, 15, 225);
-            DrawUiRect(960.0f, 1000.0f, 1490.0f, 42.0f, 46, 35, 24, 238);
+            // Texture labels and load status are intentionally unboxed, matching the game's HUD text style.
         }
 
         private static void DrawUiRect(float x, float y, float width, float height,
@@ -367,30 +359,36 @@ namespace TrucoRDR2
                 red, green, blue, alpha, false, false);
         }
 
-        private static void DrawTextElement(TextElement element)
+        private void DrawTextElement(TextElement element)
         {
             if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            // TextElement's implementation ignores Alignment, so center/right aligned elements
-            // must be shifted manually before calling its left-anchored Draw().
-            PointF originalPosition = element.Position;
-            float textWidth = EstimateTextWidth(element.Caption, element.Scale);
-            float x = originalPosition.X;
-            if (element.Alignment == Alignment.Center)
-                x -= textWidth * 0.5f;
-            else if (element.Alignment == Alignment.Right)
-                x -= textWidth;
+            string fontFace = ReferenceEquals(element, _header) ? "$title" : "$body";
+            string caption = (element.Caption ?? string.Empty)
+                .Replace("\r\n", "\n")
+                .Replace("\n", "~n~");
+            string color = "#" +
+                element.Color.R.ToString("X2") +
+                element.Color.G.ToString("X2") +
+                element.Color.B.ToString("X2");
+            string markup = "<FONT FACE='" + fontFace + "' COLOR='" + color + "'>" +
+                            caption + "</FONT>";
+            string literal = MISC.VAR_STRING(10, "LITERAL_STRING", markup);
+            string richText = MISC.VAR_STRING(42, "COLOR_STRING", 0, literal);
 
-            element.Position = new PointF(x, originalPosition.Y);
-            try
-            {
-                element.Draw();
-            }
-            finally
-            {
-                element.Position = originalPosition;
-            }
+            HUD.SET_TEXT_SCALE(element.Scale, element.Scale);
+            HUD.SET_TEXT_CENTRE(element.Alignment == Alignment.Center);
+            HUD.SET_TEXT_DROPSHADOW(1, 0, 0, 0, 180);
+
+            float x = element.Position.X;
+            if (element.Alignment == Alignment.Right)
+                x -= EstimateTextWidth(caption, element.Scale);
+
+            HUD._DISPLAY_TEXT(
+                richText,
+                x / RDR2.UI.Screen.Width,
+                element.Position.Y / RDR2.UI.Screen.Height);
         }
 
         private static float EstimateTextWidth(string caption, float scale)
