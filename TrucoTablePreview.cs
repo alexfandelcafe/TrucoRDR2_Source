@@ -951,17 +951,14 @@ namespace TrucoRDR2
             {
                 int points = round.EnvidoFor(TrucoPlayer.Opponent);
 
-                if (TrucoAi.ShouldRaiseEnvido(points, pending))
+                TrucoCall? raise = TrucoAi.ChooseEnvidoRaise(
+                    points, pending, _match.OpponentScore, _match.PlayerScore, _match.TargetPoints);
+                if (raise.HasValue &&
+                    round.CanRaiseEnvido(TrucoPlayer.Opponent, raise.Value) &&
+                    round.CallEnvido(TrucoPlayer.Opponent, raise.Value))
                 {
-                    TrucoCall raise = pending == TrucoCall.Envido && points >= 33
-                        ? TrucoCall.RealEnvido
-                        : TrucoCall.FaltaEnvido;
-                    if (round.CanRaiseEnvido(TrucoPlayer.Opponent, raise) &&
-                        round.CallEnvido(TrucoPlayer.Opponent, raise))
-                    {
-                        TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                        return;
-                    }
+                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                    return;
                 }
 
                 accepted = TrucoAi.ShouldAcceptEnvido(
