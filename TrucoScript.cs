@@ -228,8 +228,18 @@ namespace TrucoRDR2
             if (!_previewEnabled)
                 return;
 
-            _header.Draw();
-            _instructions.Draw();
+            try
+            {
+                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
+            }
+            catch
+            {
+                // Keep the texture viewer usable even if the renderer lacks this draw-order native.
+            }
+
+            DrawPreviewSurface();
+            DrawTextElement(_header);
+            DrawTextElement(_instructions);
 
             bool dictionaryExists;
             bool dictionaryLoaded;
@@ -259,7 +269,7 @@ namespace TrucoRDR2
                 }
 
                 SetStatusCaption("Error de TXD (" + ex.GetType().Name + "). Ver scripts\\TrucoRDR2.log.");
-                _status.Draw();
+                DrawTextElement(_status);
                 DrawVisibleCardLabels();
                 return;
             }
@@ -310,7 +320,7 @@ namespace TrucoRDR2
                 }
             }
 
-            _status.Draw();
+            DrawTextElement(_status);
 
             for (int i = 0; i < CardsShown; i++)
             {
@@ -318,14 +328,52 @@ namespace TrucoRDR2
                     _sprites[i].Draw();
 
                 // Keep texture names visible even when the YTD is missing or not loaded.
-                _cardLabels[i].Draw();
+                DrawTextElement(_cardLabels[i]);
             }
         }
 
         private void DrawVisibleCardLabels()
         {
             for (int i = 0; i < CardsShown; i++)
-                _cardLabels[i].Draw();
+                DrawTextElement(_cardLabels[i]);
+        }
+
+        private void DrawPreviewSurface()
+        {
+            DrawUiRect(960.0f, 105.0f, 1420.0f, 110.0f, 24, 19, 15, 225);
+            DrawUiRect(960.0f, 105.0f, 1410.0f, 100.0f, 46, 35, 24, 238);
+
+            for (int i = 0; i < CardsShown; i++)
+            {
+                float centerX = 760.0f + i * 200.0f;
+                DrawUiRect(centerX, 655.0f, 190.0f, 32.0f, 24, 19, 15, 235);
+                DrawUiRect(centerX, 655.0f, 182.0f, 25.0f, 46, 35, 24, 238);
+            }
+
+            DrawUiRect(960.0f, 1000.0f, 1500.0f, 50.0f, 24, 19, 15, 225);
+            DrawUiRect(960.0f, 1000.0f, 1490.0f, 42.0f, 46, 35, 24, 238);
+        }
+
+        private static void DrawUiRect(float x, float y, float width, float height,
+            int red, int green, int blue, int alpha)
+        {
+            PointF center = LayoutPoint(x, y);
+            SizeF size = LayoutSize(width, height);
+            GRAPHICS.DRAW_RECT(
+                center.X / RDR2.UI.Screen.Width,
+                center.Y / RDR2.UI.Screen.Height,
+                size.Width / RDR2.UI.Screen.Width,
+                size.Height / RDR2.UI.Screen.Height,
+                red, green, blue, alpha, false, false);
+        }
+
+        private static void DrawTextElement(TextElement element)
+        {
+            if (element == null)
+                return;
+
+            GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
+            element.Draw();
         }
 
         private void SetStatusCaption(string caption)
