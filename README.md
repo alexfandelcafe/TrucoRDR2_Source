@@ -1,151 +1,173 @@
 # TrucoRDR2 — truco argentino mano a mano
 
-Este proyecto C# compila como `TrucoRDR2.dll` para ScriptHookRDR2DotNet V2.2.0 / .NET Framework 4.8.
+Mod de **truco argentino mano a mano contra la IA** para RDR2 Story Mode, escrito en C# para **ScriptHookRDR2DotNet V2.2.0** y **.NET Framework 4.8**.
 
-**Alcance de esta build:** carga y prueba las 40 texturas y ofrece una partida mano a mano de truco argentino con tanteador, apuestas de envido y truco, flor opcional, y un rival con estrategia básica. La IA es heurística y todavía necesita ajustes a partir de las pruebas dentro del juego.
+Incluye motor de reglas, tanteador, apuestas, rival heurístico, mesa superpuesta, controles de teclado y mando, configuración persistente, punto de control de partidas, visor de texturas y sonidos de interfaz.
 
 ## Requisitos
 
-- RDR2 para PC en modo Historia.
+- Red Dead Redemption 2 para PC, en modo Historia.
 - ScriptHookRDR2 de Alexander Blade.
-- Community ScriptHookRDR2DotNet V2.2.0 (usa la `ScriptHookRDRNetAPI.dll` de esa misma instalación).
-- .NET Framework 4.8 Developer Pack / targeting pack de Visual Studio.
-- Lenny's Mod Loader para que el YTD personalizado se cargue como recurso independiente.
+- Community ScriptHookRDR2DotNet V2.2.0. El proyecto referencia la ScriptHookRDRNetAPI.dll instalada junto al juego.
+- Visual Studio 2022 con la carga de trabajo de .NET Framework 4.8 o MSBuild y el targeting pack correspondiente.
+- Lenny's Mod Loader (LML), para cargar el YTD personalizado.
 
-No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe referenciar la DLL instalada con ScriptHookRDR2DotNet.
+No se incluye ni redistribuye ScriptHookRDRNetAPI.dll.
 
-## Configurar el YTD
+## Instalar las texturas
 
-1. Usá la herramienta **RedM / RDR2**: https://redm.fivemad.com/tools/folders-to-ytd. No uses la versión FiveM (`fivemad.com`), que genera diccionarios para GTA V y no para RDR2. La versión RedM genera diccionarios RDR2 y entrega un ZIP de recurso. Extraé el ZIP y copiá solamente el archivo `.ytd` que está dentro de `stream`; para LML no necesitás `fxmanifest.lua` ni el README del recurso.
+1. Generá el diccionario YTD en formato RDR2. La herramienta de conversión debe producir un YTD compatible con RedM/RDR2; no uses una salida para GTA V.
+2. Copiá el archivo a:
 
-   Para esta build, el nombre debe ser `trucor2_cards.ytd` y la ruta manual es:
+   D:\Red Dead Redemption 2\lml\stream\trucor2_cards.ytd
 
-   `D:\Red Dead Redemption 2\lml\stream\trucor2_cards.ytd`
+   Creá lml\stream si no existe. Si tu juego está en otra carpeta, usá la ruta equivalente.
+3. El YTD debe llamarse trucor2_cards.ytd y contener las texturas de las caras 01-bastos, 01-copas, 01-espadas, 01-oros, etc. El catálogo usa 01–07 y 10–12; no lleva 8 ni 9. Incluí también la textura reverso (sin extensión), que se utiliza para las cartas ocultas del rival.
+4. En scripts\TrucoRDR2.ini, verificá:
 
-   Creá `lml\stream` si no existe. No lo dejes en `lml\TrucoRDR2\stream` salvo que esa carpeta tenga un `install.xml` válido que registre el contenido.
-
-2. Abrí `scripts/TrucoRDR2.ini` y confirmá que la sección contiene:
-
-   ```ini
+   ~~~ini
    [Textures]
    TextureDictionary=trucor2_cards
-   ```
+   ~~~
 
-   La combinación para abrir la mesa se configura en la sección `[Controls]` del mismo archivo INI; el valor predeterminado es `Control+F9`.
+## Compilar e instalar
 
-3. Las caras de las 40 cartas deben tener estos nombres de textura, sin `.png`: `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. El catálogo usa rangos `01`–`07` y `10`–`12` y omite 8 y 9, que no se usan en el truco argentino. Además, incluí la textura `reverso` (sin extensión), que el mod usa para el dorso de las cartas ocultas del rival.
+### Método manual
 
-   Si generaste el YTD con RDR2 Texture ToolKit, usá el archivo de salida que termina en `_nya.ytd`; renombrá esa variante a `trucor2_cards.ytd`. El ToolKit también puede generar otro `.ytd` auxiliar que no es el destinado a RDR2.
+Abrí TrucoRDR2.csproj en Visual Studio y compilá la configuración Release | x64. La propiedad RDR2Dir apunta por defecto a D:\Red Dead Redemption 2. También podés compilar desde una terminal:
 
-## Compilar en Visual Studio 2022
+~~~bat
+msbuild TrucoRDR2.csproj /m /p:Configuration=Release /p:Platform=x64 /p:RDR2Dir="D:\Juegos\RDR2"
+~~~
 
-1. Abrí `TrucoRDR2.csproj`.
-2. Si RDR2 no está en la ruta predeterminada, editá la propiedad `RDR2Dir` dentro del `.csproj`, o compilá por línea de comandos:
+Si la DLL de ScriptHook está en otro lugar, indicá /p:ScriptHookRDRNetAPIDll="RUTA\ScriptHookRDRNetAPI.dll".
 
-   ```bat
-   msbuild TrucoRDR2.csproj /p:Configuration=Release /p:Platform=x64 /p:RDR2Dir="D:\\Juegos\\RDR2"
-   ```
+El resultado es bin\Release\TrucoRDR2.dll. Copiá esa DLL y TrucoRDR2.ini a RDR2\scripts\.
 
-   La carpeta indicada debe contener `ScriptHookRDRNetAPI.dll`. También se puede indicar la ruta exacta a esa DLL:
+### Instalador por lote
 
-   ```bat
-   msbuild TrucoRDR2.csproj /p:Configuration=Release /p:Platform=x64 /p:ScriptHookRDRNetAPIDll="D:\\Juegos\\RDR2\\ScriptHookRDRNetAPI.dll"
-   ```
+También podés ejecutar Install.bat desde Windows. Acepta la ruta del juego como parámetro o usa D:\Red Dead Redemption 2 por defecto. Comprueba que estén RDR2.exe y ScriptHookRDRNetAPI.dll, compila e instala la DLL y el INI en scripts\.
 
-3. El resultado se genera en `bin/Release/TrucoRDR2.dll`.
-4. Copiá `TrucoRDR2.dll` y `TrucoRDR2.ini` a `RDR2/scripts/`.
+~~~bat
+Install.bat "D:\Juegos\RDR2"
+~~~
 
-## Probar dentro del juego
+El instalador no descarga ni instala ScriptHook, LML ni el YTD.
 
-- `F7`: mostrar u ocultar la vista de texturas. F6 queda libre porque abre el modo foto de RDR2. La tecla se procesa una sola vez hasta que se suelta, para evitar alternancias por repetición de teclado.
-- `Av Pág` (`PageDown`): avanzar una carta en el catálogo.
-- `Re Pág` (`PageUp`): retroceder una carta.
-- `Esc`: cerrar la vista.
+## Configuración
 
-Los nombres de las tres texturas seleccionadas se muestran incluso cuando el YTD no está instalado o no se ha cargado. Las imágenes solo se dibujan cuando el juego confirma que el diccionario está cargado. La línea de estado permite separar problemas de registro del YTD de problemas con los nombres internos.
+Las opciones iniciales están en scripts\TrucoRDR2.ini:
 
-Al activar F7, el script solicita el diccionario antes de consultar si existe; esto evita bloquear la primera solicitud cuando el diccionario todavía no está en memoria. También crea `scripts\TrucoRDR2.log`, independiente del log de LML. Allí registra la ruta convencional esperada (`lml\stream\trucor2_cards.ytd`), si el archivo existe en disco, cuándo envía la solicitud y los resultados de `DOES_STREAMED_TEXTURE_DICT_EXIST` / `HAS_STREAMED_TEXTURE_DICT_LOADED`.
+~~~ini
+[Textures]
+TextureDictionary=trucor2_cards
 
-Si el estado muestra «El juego no encuentra…», abrí `scripts\TrucoRDR2.log` y comprobá primero `existe en disco: True`. Si muestra `False`, el archivo no está en la ruta esperada. Si muestra `True` pero el diccionario sigue sin aparecer, revisá que hayas generado el YTD con la herramienta RedM/RDR2, que se llame exactamente `trucor2_cards.ytd` y que LML esté instalado (incluido `vfs.asi` junto a `RDR2.exe`). El log estándar de LML suele estar en la carpeta raíz del juego como `lml.log`; en ese archivo buscá `trucor2_cards.ytd` o `adding`. Si no existe ese log, el archivo `scripts\TrucoRDR2.log` sigue aportando el diagnóstico del lado del juego.
+[Controls]
+TableToggle=Control+F9
 
-Si aparece «Diccionario cargado» pero una carta queda vacía, comprobá que las texturas internas se llamen exactamente `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. y revisá la tabla de nombres de la herramienta antes de generar el YTD.
-
-## Partida de truco mano a mano
-
-La mesa permite disputar partidas completas entre el jugador y un rival controlado por la IA.
-
-### Configuración
-
-En `scripts/TrucoRDR2.ini`:
-
-```ini
 [Game]
 ; 15 o 30 puntos.
 TargetPoints=30
-; Flor es opcional.
+; Activar o desactivar flor.
 FlorEnabled=false
 
 [Audio]
 Enabled=true
-```
+~~~
 
-- `TargetPoints=15`: partida corta a 15.
-- `TargetPoints=30`: partida tradicional a 30, con malas y buenas.
-- `FlorEnabled=true`: activa la flor. Si solo un jugador tiene flor, se cuenta automáticamente; si ambos tienen, se abre la respuesta y las subidas.
-- `Enabled=true`: reproduce sonidos de interfaz que ya incluye RDR2.
+- TargetPoints: duración de la partida (15 o 30).
+- FlorEnabled: activa flor, contra flor y contra flor al resto.
+- Audio.Enabled: sonidos de interfaz incluidos en RDR2.
+- Controls.TableToggle: combinación para abrir/cerrar la mesa. Valor inicial: Control+F9.
 
-### Controles durante tu turno
+Los cambios de duración, flor y sonido que hagas desde el menú se escriben en el INI automáticamente. La combinación de apertura se lee al cargar el script; cambiarla requiere recargar el script o reiniciar el juego.
 
-- Flechas izquierda/derecha: seleccionar una carta.
-- `Enter`: jugar la carta seleccionada.
-- `E`: cantar Envido.
-- `R`: cantar Real Envido.
-- `F`: cantar Falta Envido.
-- `T`: cantar Truco, Retruco o Vale Cuatro según la etapa de la apuesta.
-- `M`: irse al mazo y conceder la mano por el valor actual de la apuesta.
+## Controles
 
-### Responder a un canto
+### Teclado
 
-- `Q`: Quiero.
-- `N`: No quiero.
-- `E`, `R`, `F`: subir el envido cuando la secuencia lo permite.
-- `T`: subir de Truco a Retruco o de Retruco a Vale Cuatro.
-- `C`: Contra Flor.
-- `B`: Contra Flor al Resto.
+| Acción | Tecla |
+|---|---|
+| Abrir/cerrar la mesa | Ctrl+F9 (configurable en INI) |
+| Mostrar/ocultar visor de texturas | F7 |
+| Cambiar carta seleccionada | Flechas izquierda/derecha |
+| Jugar carta seleccionada | Enter |
+| Envido | E |
+| Real Envido | R |
+| Falta Envido | F |
+| Truco / Retruco / Vale Cuatro | T |
+| Irse al mazo | M |
+| Quiero / No quiero | Q / N |
+| Contra Flor / Contra Flor al Resto | C / B |
+| Siguiente mano o volver al menú | Enter |
+| Cerrar la mesa | Esc |
 
-Las opciones que no correspondan al canto pendiente se ignoran. El envido se cierra cuando se juega la primera carta. La flor bloquea el envido cuando está habilitada y aparece en la mano.
+### Mando Xbox
 
-### Desarrollo de la partida
+| Acción | Control |
+|---|---|
+| Navegar menú | Cruceta arriba/abajo |
+| Cambiar selección de carta | Cruceta izquierda/derecha |
+| Jugar carta / Quiero | A |
+| No quiero / cerrar mesa | B |
+| Envido | X |
+| Truco / Retruco / Vale Cuatro | Y |
+| Real Envido | LB |
+| Falta Envido | RB |
+| Contra Flor | LT |
+| Contra Flor al Resto | RT |
+| Irse al mazo | Pulsar stick izquierdo (L3) |
 
-- El tanteador se actualiza automáticamente con los puntos de envido, flor y truco.
-- La mano rota entre jugador y rival.
-- Se juega al mejor de tres bazas, con resolución de pardas.
-- El truco vale 1 sin canto, 2 con Truco querido, 3 con Retruco querido y 4 con Vale Cuatro querido. Falta Envido aceptado se calcula según la puntuación de la partida; no se suma como si fuera un Envido o Real Envido normal. Si se rechaza una subida, se cobran los puntos correspondientes a la apuesta previamente establecida para el jugador que lanzó la subida.
-- No querer Truco, Retruco o Vale Cuatro entrega la mano por el valor anterior de la apuesta.
-- Al terminar una mano, `Enter` reparte la siguiente.
-- Al terminar la partida, `Enter` vuelve al menú; desde ahí podés iniciar otra.
-- `Esc` cierra la mesa.
-- La combinación configurada en `[Controls]` abre/cierra la mesa. El valor predeterminado es `Ctrl+F9`; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
+En una respuesta pendiente, A equivale a Quiero y B a No quiero. En el resto de las pantallas, B cierra la mesa. Los controles del mando se consultan con el nativo de controles deshabilitados para que sigan funcionando mientras la mesa bloquea el movimiento y el combate del personaje. La asignación se basa en los controles frontend de RDR2; se debe confirmar con el mando que uses.
 
-### Rival controlado por IA
+El visor de texturas F7 permite recorrer el catálogo con Av Pág/Re Pág y cerrarlo con Esc. El estado y el log scripts\TrucoRDR2.log ayudan a detectar si el YTD no existe, no se carga o tiene nombres internos incorrectos.
 
-El rival ya no juega cartas al azar. Evalúa su envido, la fuerza de su mano, la carta que tiene enfrente y el tamaño de la apuesta. Puede cantar o subir apuestas y aceptar/rechazar según su mano y el tanteador. Esta primera IA es deliberadamente básica: no simula todos los estilos humanos y deberá ajustarse con pruebas reales.
+## Reglas y partida
 
-### Interfaz y presentación
+- Mazo español de 40 cartas: se excluyen 8 y 9.
+- Jerarquía del truco argentino, envido, real envido y falta envido.
+- Truco, retruco y vale cuatro, con respuestas y rechazos.
+- Flor opcional, contra flor y contra flor al resto.
+- Partidas de 15 o 30 puntos, malas/buenas, rotación de mano, pardas y cierre de partida.
+- Irse al mazo y resolución de puntos según la apuesta activa.
+- Rival con heurísticas que ponderan cartas propias, tanteador y valor de las apuestas; no conoce las cartas ocultas del jugador.
 
-La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las cartas jugadas y el canto pendiente. Usa un panel superior oscuro con acentos dorados, paño verde y marco de madera, la textura `reverso` del YTD para las cartas ocultas y selección resaltada. Las etiquetas de cartas, VOS/RIVAL, el título "TUS CARTAS" y el estado inferior no llevan placas de fondo. El texto se dibuja con los nativos HUD `_DISPLAY_TEXT` y `VAR_STRING`, usando las caras de fuente del juego `$title` y `$body`, en vez del renderizador de texto de depuración de `TextElement`. Los efectos son sonidos del HUD que ya incluye RDR2.
+Los reglamentos de truco varían según la mesa. La implementación contiene una interpretación concreta de las secuencias y del cálculo de Falta Envido; si se adopta otro reglamento local, sus casos de puntuación deben ajustarse y probarse explícitamente.
 
-La implementación de fuentes sigue el formato de texto enriquecido de RDR2 (`<FONT FACE='$title'>…</FONT>`) documentado en [RDR2Mods NativeDB](https://www.rdr2mods.com/nativedb/index/hud/_draw_text-r1623/) y en [el ejemplo de uso de fuentes nativas](https://www.rdr2mods.com/forums/topic/649-changing-draw_text-font/).
+## Guardado y continuidad
 
-El mod ya no usa `TextElement.Draw()` para pintar etiquetas: usa `HUD._DISPLAY_TEXT` y las etiquetas de fuentes integradas en el juego, con sombra de texto nativa. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; el tamaño final de fuente y la composición requieren prueba dentro del juego.
+- Mientras el script siga cargado, cerrar el overlay conserva la mano actual en memoria.
+- Al terminar cada mano se guarda un único punto de control en scripts\TrucoRDR2.save, con tanteador, objetivo, flor, mano siguiente y estado final de la partida.
+- Al reiniciar el juego, el menú ofrece CONTINUAR PARTIDA cuando hay un punto de control válido. Se vuelve a repartir una mano nueva con el tanteador y la mano restaurados.
+- No se serializan las cartas ni una baza a medio jugar. Si el juego se cierra durante una mano, se reanuda desde el último cierre de mano. En una partida nueva, el primer punto de control se crea al finalizar la primera mano.
+- Elegir NUEVA PARTIDA elimina el punto de control anterior.
 
-## Integración y comportamiento
+Este archivo es un solo guardado de continuidad, no un historial ni estadísticas de partidas.
 
-- La mesa desactiva los grupos de controles de jugador, cámara y frontend mientras está abierta para evitar acciones del personaje desde detrás de la interfaz.
-- La partida no congela el mundo: si una caída o un ataque reduce la salud del personaje, el overlay se cierra automáticamente, pero conserva la mano y el tanteador para reanudar con Ctrl+F9.
-- La combinación de apertura se lee al cargar el script desde la sección [Controls] de TrucoRDR2.ini; los cambios requieren volver a cargar/reiniciar el script.
-- La escala y las posiciones están basadas en un marco de 1920×1080 que se adapta con letterboxing a proporciones distintas. Se pueden retocar durante la prueba en el juego.
+## Interfaz y relación con el mundo
 
-## Nota sobre validación
+La mesa es un overlay. Conserva el diseño de paño verde y madera, los acentos dorados, el reverso real reverso, las animaciones de reparto y las etiquetas sin placas de fondo. El texto vuelve a utilizar TextElement.Draw() con el ajuste manual de alineación; **no usa** _DISPLAY_TEXT, VAR_STRING ni las fuentes HUD nativas.
 
-El código está preparado para compilar contra la API V2.2.0, pero en este entorno no está instalado MSBuild/Visual Studio ni el runtime del juego, así que no puedo certificar una compilación ni probar la carga real del YTD aquí. El proyecto reporta un error de compilación explícito si no encuentra la DLL de API requerida.
+Mientras está abierta se bloquean los grupos de control de jugador, cámara y frontend. Si el personaje recibe daño o muere, el overlay se cierra para que el jugador recupere el control; la partida en memoria se conserva. El mundo no se congela y la mesa no crea un NPC sentado ni se ancla a una mesa física del mapa: esa integración requiere elegir ubicaciones, modelos y escenas y validarlos dentro del juego.
+
+La distribución usa un diseño de referencia 1920×1080 y adapta posiciones y tamaños a otras resoluciones. La composición visual final debe probarse en el juego en las resoluciones y escalas de interfaz que se vayan a usar.
+
+## Pruebas
+
+Los tests puros de motor, IA, configuración y guardado están en tests\TrucoRDR2.Tests.csproj. En Windows con .NET SDK y el targeting pack de .NET Framework 4.8:
+
+~~~bat
+dotnet run --project tests\TrucoRDR2.Tests.csproj --configuration Release
+~~~
+
+El workflow .github/workflows/core-tests.yml ejecuta esa batería en Windows en cada push a la rama y en los pull requests hacia main. Estas pruebas no reemplazan la compilación del plugin contra tu DLL de ScriptHook ni las pruebas dentro de RDR2: el juego, ScriptHook y el YTD no se ejecutan en CI.
+
+## Alcance de esta versión
+
+Incluye una partida para dos jugadores locales (vos contra la IA) en modo Historia. No incluye partidas de cuatro/seis jugadores, multijugador online, estadísticas o historial, desbloqueos ni mazos alternativos, que quedan fuera del alcance actual.
+
+## Diagnóstico y validación
+
+El script crea scripts\TrucoRDR2.log, registra la ubicación esperada del YTD y los estados del streaming de texturas. No redistribuye archivos del juego ni de ScriptHook.
+
+El repositorio incorpora pruebas automatizadas del motor independiente y CI para esas pruebas. **No se debe considerar certificada la compilación del mod ni su ejecución en RDR2 hasta validar en tu instalación** la DLL de ScriptHook, el YTD, los controles y la continuidad de partida.
