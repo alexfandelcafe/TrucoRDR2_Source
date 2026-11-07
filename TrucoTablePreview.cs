@@ -1540,41 +1540,25 @@ namespace TrucoRDR2
             if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            string face = (ReferenceEquals(element, _header) ||
-                           ReferenceEquals(element, _handTitle))
-                ? "$title"
-                : "$body";
-            DrawNativeText(element, face);
-        }
+            // TextElement's implementation ignores Alignment, so center/right aligned elements
+            // must be shifted manually before calling its left-anchored Draw().
+            PointF originalPosition = element.Position;
+            float textWidth = EstimateTextWidth(element.Caption, element.Scale);
+            float x = originalPosition.X;
+            if (element.Alignment == Alignment.Center)
+                x -= textWidth * 0.5f;
+            else if (element.Alignment == Alignment.Right)
+                x -= textWidth;
 
-        private static void DrawNativeText(TextElement element, string fontFace)
-        {
-            // Use RDR2's HUD text renderer and built-in font faces, rather than the
-            // ScriptHook TextElement debug-text path. Font tags are supported by _DISPLAY_TEXT.
-            string caption = (element.Caption ?? string.Empty)
-                .Replace("\r\n", "\n")
-                .Replace("\n", "~n~");
-            string color = "#" +
-                element.Color.R.ToString("X2") +
-                element.Color.G.ToString("X2") +
-                element.Color.B.ToString("X2");
-            string markup = "<FONT FACE='" + fontFace + "' COLOR='" + color + "'>" +
-                            caption + "</FONT>";
-            string literal = MISC.VAR_STRING(10, "LITERAL_STRING", markup);
-            string richText = MISC.VAR_STRING(42, "COLOR_STRING", 0, literal);
-
-            HUD.SET_TEXT_SCALE(element.Scale, element.Scale);
-            HUD.SET_TEXT_CENTRE(element.Alignment == Alignment.Center);
-            HUD.SET_TEXT_DROPSHADOW(1, 0, 0, 0, 180);
-
-            float x = element.Position.X;
-            if (element.Alignment == Alignment.Right)
-                x -= EstimateTextWidth(caption, element.Scale);
-
-            HUD._DISPLAY_TEXT(
-                richText,
-                x / RDR2.UI.Screen.Width,
-                element.Position.Y / RDR2.UI.Screen.Height);
+            element.Position = new PointF(x, originalPosition.Y);
+            try
+            {
+                element.Draw();
+            }
+            finally
+            {
+                element.Position = originalPosition;
+            }
         }
 
         private static float EstimateTextWidth(string caption, float scale)
