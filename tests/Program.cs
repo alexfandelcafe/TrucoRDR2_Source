@@ -30,6 +30,8 @@ internal static class Program
         Run("AI changes risk thresholds with score", AiScorePolicy);
         Run("Settings writer preserves unrelated INI keys", SettingsPersistence);
         Run("Match checkpoint round-trips", MatchCheckpointRoundTrip);
+        Run("Restoring an active match preserves score and mano", RestoreActiveMatch);
+        Run("Restoring a finished match preserves winner", RestoreCompletedMatch);
         Run("Corrupt checkpoint is ignored", CorruptCheckpointIsIgnored);
 
         Console.WriteLine();
@@ -306,6 +308,36 @@ internal static class Program
         {
             Directory.Delete(directory, true);
         }
+    }
+
+    private static void RestoreActiveMatch()
+    {
+        TrucoMatchProgress saved = new TrucoMatchProgress(
+            30, 11, 7, TrucoPlayer.Opponent, false, false, null);
+        TrucoMatch restored = new TrucoMatch(saved, new Random(31));
+
+        Equal(30, restored.TargetPoints);
+        Equal(11, restored.PlayerScore);
+        Equal(7, restored.OpponentScore);
+        Equal(TrucoPlayer.Opponent, restored.Mano);
+        True(!restored.IsComplete, "La partida restaurada debería seguir activa.");
+        True(!restored.FlorEnabled, "La opción de flor no se restauró.");
+        True(restored.Round != null, "No se repartió una nueva mano.");
+    }
+
+    private static void RestoreCompletedMatch()
+    {
+        TrucoMatchProgress saved = new TrucoMatchProgress(
+            15, 15, 11, TrucoPlayer.Player, true, true, TrucoPlayer.Player);
+        TrucoMatch restored = new TrucoMatch(saved, new Random(32));
+
+        Equal(15, restored.TargetPoints);
+        Equal(15, restored.PlayerScore);
+        Equal(11, restored.OpponentScore);
+        True(restored.IsComplete, "La partida debería seguir terminada.");
+        Equal(TrucoPlayer.Player, restored.Winner.Value);
+        True(restored.Round != null && restored.Round.Tricks.Count == 0,
+            "La restauración no debe inventar bazas previas.");
     }
 
     private static void CorruptCheckpointIsIgnored()
