@@ -164,6 +164,7 @@ namespace TrucoRDR2
 
         private static bool ReadInt(IDictionary<string, string> values, string key, out int result)
         {
+            result = 0;
             string raw;
             return values.TryGetValue(key, out raw) &&
                 int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
@@ -171,12 +172,14 @@ namespace TrucoRDR2
 
         private static bool ReadBool(IDictionary<string, string> values, string key, out bool result)
         {
+            result = false;
             string raw;
             return values.TryGetValue(key, out raw) && bool.TryParse(raw, out result);
         }
 
         private static bool ReadEnum(IDictionary<string, string> values, string key, out TrucoPlayer result)
         {
+            result = TrucoPlayer.Player;
             string raw;
             return values.TryGetValue(key, out raw) &&
                 Enum.TryParse(raw, true, out result) &&
