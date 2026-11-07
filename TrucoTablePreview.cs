@@ -235,6 +235,15 @@ namespace TrucoRDR2
 
         private void StartMatch()
         {
+            try
+            {
+                TrucoMatchProgressStore.Delete(_matchSavePath);
+            }
+            catch (Exception ex)
+            {
+                _saveStatusMessage = "No se pudo quitar la partida anterior: " + ex.Message;
+            }
+
             _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
             _savedProgress = null;
             _hasSavedMatch = false;
@@ -276,7 +285,7 @@ namespace TrucoRDR2
             _dealAnimationActive = !_match.IsComplete;
             _playedCardAnimation = null;
             _spritesCreated = false;
-            _progressSavedForCurrentRound = true;
+            _progressSavedForCurrentRound = !_match.IsComplete;
             _saveStatusMessage = null;
             DisposeSprites();
             UpdateHandLabels();
@@ -305,10 +314,11 @@ namespace TrucoRDR2
                 TrucoMatchProgressStore.Save(_matchSavePath, _savedProgress);
                 _hasSavedMatch = true;
                 _progressSavedForCurrentRound = true;
-                _saveStatusMessage = "Partida guardada al cierre de la mano.";
+                _saveStatusMessage = null;
             }
             catch (Exception ex)
             {
+                _progressSavedForCurrentRound = true;
                 _saveStatusMessage = "No se pudo guardar la partida: " + ex.Message;
             }
         }
@@ -369,7 +379,7 @@ namespace TrucoRDR2
 
             SaveMatchProgress();
             _match.StartNextRound();
-            _progressSavedForCurrentRound = true;
+            _progressSavedForCurrentRound = !_match.IsComplete;
             _selectedCardIndex = 0;
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _dealAnimationStartUtc = DateTime.UtcNow;
@@ -1473,10 +1483,10 @@ namespace TrucoRDR2
 
             if (_match.IsComplete)
                 return (_match.Winner == TrucoPlayer.Player ? "GANASTE LA PARTIDA" : "EL RIVAL GANO LA PARTIDA") +
-                       ". ENTER: volver al menú.";
+                       ". ENTER: volver al menú." + SaveStatusSuffix();
             if (round.IsComplete)
                 return (round.Winner == TrucoPlayer.Player ? "Ganaste la mano" : "El rival ganó la mano") +
-                       " (" + round.PointsAwardedForHand + " puntos). ENTER: siguiente mano.";
+                       " (" + round.PointsAwardedForHand + " puntos). ENTER: siguiente mano." + SaveStatusSuffix();
 
             if (round.HasPendingResponse && round.PendingResponder == TrucoPlayer.Player)
             {
@@ -1519,6 +1529,13 @@ namespace TrucoRDR2
             if (round.CurrentPlayer == TrucoPlayer.Player)
                 return "TU TURNO: FLECHAS/DPAD + ENTER/A | X ENVIDO | LB REAL | RB FALTA | Y TRUCO | L3 MAZO";
             return "Turno del rival...";
+        }
+
+        private string SaveStatusSuffix()
+        {
+            return string.IsNullOrEmpty(_saveStatusMessage)
+                ? string.Empty
+                : " | " + _saveStatusMessage;
         }
 
         private void UpdateHandLabels()
