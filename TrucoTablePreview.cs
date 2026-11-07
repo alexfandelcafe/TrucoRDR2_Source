@@ -20,6 +20,7 @@ namespace TrucoRDR2
         private const float PlayedCardHeight = 162.0f;
         private const float OpponentBackWidth = 64.0f;
         private const float OpponentBackHeight = 96.0f;
+        private const string OpponentBackTextureName = "reverso";
         private const double ComputerThinkSeconds = 0.65;
 
         private sealed class CardAnimation
@@ -62,6 +63,7 @@ namespace TrucoRDR2
         private readonly TextElement[] _playedLabels = new TextElement[6];
         private readonly Sprite[] _handSprites = new Sprite[3];
         private readonly Sprite[] _opponentRevealSprites = new Sprite[3];
+        private readonly Sprite[] _opponentBackSprites = new Sprite[3];
         private readonly Sprite[] _playedSprites = new Sprite[6];
 
         private TrucoMatch _match;
@@ -165,8 +167,8 @@ namespace TrucoRDR2
             {
                 _handLabels[i] = new TextElement(
                     string.Empty,
-                    LayoutPoint(650.0f + i * 230.0f + HandCardWidth / 2.0f, 670.0f),
-                    LayoutTextScale(0.38f), Color.WhiteSmoke, Alignment.Center, true, true);
+                    LayoutPoint(650.0f + i * 230.0f + HandCardWidth / 2.0f, 963.0f),
+                    LayoutTextScale(0.34f), Color.WhiteSmoke, Alignment.Center, true, true);
             }
 
             for (int i = 0; i < 6; i++)
@@ -195,6 +197,7 @@ namespace TrucoRDR2
                 _showMenu = false;
             }
 
+            SetHeaderForMenu(_showMenu);
             DisposeSprites();
             _textureRequestSent = false;
             _textureDictionaryLoaded = false;
@@ -210,6 +213,7 @@ namespace TrucoRDR2
         {
             _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
             _showMenu = false;
+            SetHeaderForMenu(false);
             _selectedCardIndex = 0;
             _textureRequestSent = false;
             _textureDictionaryLoaded = false;
@@ -253,6 +257,7 @@ namespace TrucoRDR2
             {
                 _match = null;
                 _showMenu = true;
+                SetHeaderForMenu(true);
                 _menuSelection = 0;
                 DisposeSprites();
                 _spritesCreated = false;
@@ -539,6 +544,17 @@ namespace TrucoRDR2
             if (!_visible)
                 return;
 
+            // Use the normal menu draw layer. Some ScriptHookRDR2DotNet builds otherwise
+            // leave TextElement output flickering or behind other 2D elements.
+            try
+            {
+                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
+            }
+            catch
+            {
+                // Rendering should continue if this optional layer adjustment is unavailable.
+            }
+
             // The world keeps running behind the overlay. If combat or a fall damages the player,
             // close the overlay but retain the match state so Ctrl+F9 can reopen it safely.
             try
@@ -575,9 +591,9 @@ namespace TrucoRDR2
             if (_showMenu)
             {
                 DrawMenuSurface();
-                _header.Draw();
-                _menuOptions.Draw();
-                _menuHint.Draw();
+                DrawTextElement(_header);
+                DrawTextElement(_menuOptions);
+                DrawTextElement(_menuHint);
                 return;
             }
 
@@ -586,8 +602,6 @@ namespace TrucoRDR2
 
             DrawTopPanel();
             DrawTableSurface();
-            _header.Draw();
-            _instructions.Draw();
 
             bool dictionaryExists = false;
             bool dictionaryLoaded = false;
@@ -622,7 +636,6 @@ namespace TrucoRDR2
 
                 UpdateText();
                 DrawTextOnly();
-                DrawHandLabels();
                 return;
             }
 
@@ -632,17 +645,17 @@ namespace TrucoRDR2
                 RefreshSprites();
 
             UpdateText();
-            _scoreboard.Draw();
-            _roundInfo.Draw();
-            _announcement.Draw();
             DrawOpponentCardBacks();
             for (int i = 0; i < _opponentRevealSprites.Length; i++)
                 if (_opponentRevealSprites[i] != null)
                     _opponentRevealSprites[i].Draw();
-            _handTitle.Draw();
 
-            for (int i = 0; i < _playedLabels.Length; i++)
-                _playedLabels[i].Draw();
+            // Add dark label plates first, then draw all text after card sprites so it cannot
+            // flicker underneath or be covered by a sprite rendered later in the frame.
+            DrawHandTitleSurface();
+            DrawPlayedLabelSurfaces();
+            DrawHandLabelSurfaces();
+            DrawStatusSurface();
 
             for (int i = 0; i < _playedSprites.Length; i++)
             {
@@ -670,12 +683,25 @@ namespace TrucoRDR2
                     if (!DrawDealingCard(i))
                         _handSprites[i].Draw();
                 }
-
-                if (!_dealAnimationActive || DateTime.UtcNow >= _dealAnimationStartUtc.AddMilliseconds(650))
-                    _handLabels[i].Draw();
             }
 
-            _status.Draw();
+            DrawTextElement(_header);
+            DrawTextElement(_instructions);
+            DrawTextElement(_scoreboard);
+            DrawTextElement(_roundInfo);
+            DrawTextElement(_announcement);
+            DrawTextElement(_handTitle);
+
+            for (int i = 0; i < _playedLabels.Length; i++)
+                DrawTextElement(_playedLabels[i]);
+
+            if (!_dealAnimationActive || DateTime.UtcNow >= _dealAnimationStartUtc.AddMilliseconds(650))
+            {
+                for (int i = 0; i < _handLabels.Length; i++)
+                    DrawTextElement(_handLabels[i]);
+            }
+
+            DrawTextElement(_status);
         }
 
         private void AdvanceComputer()
@@ -1166,22 +1192,27 @@ namespace TrucoRDR2
         private void DrawMenuSurface()
         {
             PointF center = LayoutPoint(960.0f, 535.0f);
-            SizeF outer = LayoutSize(790.0f, 330.0f);
-            SizeF inner = LayoutSize(770.0f, 310.0f);
+            SizeF outer = LayoutSize(790.0f, 430.0f);
+            SizeF inner = LayoutSize(770.0f, 410.0f);
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
-            DrawRect(center.X, center.Y - LayoutHeight(145.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
-            DrawRect(center.X, center.Y + LayoutHeight(145.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
+            DrawRect(center.X, center.Y - LayoutHeight(170.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
+            DrawRect(center.X, center.Y + LayoutHeight(175.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
+        }
+
+        private void SetHeaderForMenu(bool menu)
+        {
+            _header.Position = LayoutPoint(960.0f, menu ? 340.0f : 65.0f);
         }
 
         private void DrawTopPanel()
         {
-            PointF center = LayoutPoint(960.0f, 188.0f);
-            SizeF outer = LayoutSize(1420.0f, 185.0f);
-            SizeF inner = LayoutSize(1404.0f, 169.0f);
+            PointF center = LayoutPoint(960.0f, 155.0f);
+            SizeF outer = LayoutSize(1420.0f, 250.0f);
+            SizeF inner = LayoutSize(1404.0f, 234.0f);
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 18, 16, 13, 220);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 32, 27, 21, 218);
-            DrawRect(center.X, center.Y - LayoutHeight(82.0f), LayoutWidth(1320.0f), LayoutHeight(2.0f), 168, 133, 76, 235);
+            DrawRect(center.X, center.Y - LayoutHeight(59.0f), LayoutWidth(1320.0f), LayoutHeight(2.0f), 168, 133, 76, 235);
         }
 
         private void DrawTableSurface()
@@ -1194,6 +1225,48 @@ namespace TrucoRDR2
             DrawRect(center.X, center.Y, middle.Width, middle.Height, 147, 103, 54, 255);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 31, 78, 54, 235);
             DrawRect(center.X, center.Y, LayoutWidth(2.0f), LayoutHeight(165.0f), 151, 190, 128, 115);
+        }
+
+        private void DrawHandTitleSurface()
+        {
+            PointF center = LayoutPoint(960.0f, 665.0f);
+            SizeF outer = LayoutSize(310.0f, 36.0f);
+            SizeF inner = LayoutSize(300.0f, 28.0f);
+            DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 225);
+            DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
+        }
+
+        private void DrawPlayedLabelSurfaces()
+        {
+            for (int i = 0; i < _playedLabels.Length; i++)
+            {
+                PointF center = _playedLabels[i].Position;
+                SizeF outer = LayoutSize(106.0f, 28.0f);
+                SizeF inner = LayoutSize(98.0f, 22.0f);
+                DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
+                DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
+            }
+        }
+
+        private void DrawHandLabelSurfaces()
+        {
+            for (int i = 0; i < _handLabels.Length; i++)
+            {
+                PointF center = _handLabels[i].Position;
+                SizeF outer = LayoutSize(212.0f, 31.0f);
+                SizeF inner = LayoutSize(204.0f, 25.0f);
+                DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
+                DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
+            }
+        }
+
+        private void DrawStatusSurface()
+        {
+            PointF center = LayoutPoint(960.0f, 1025.0f);
+            SizeF outer = LayoutSize(1500.0f, 48.0f);
+            SizeF inner = LayoutSize(1490.0f, 40.0f);
+            DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 225);
+            DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
         }
 
         private void DrawSelectedCardFrame(int index)
@@ -1228,13 +1301,11 @@ namespace TrucoRDR2
                 float centerX = position.X + cardSize.Width / 2.0f;
                 float centerY = position.Y + cardSize.Height / 2.0f;
 
+                // Keep a narrow frame behind the actual YTD back texture named "reverso".
                 DrawRect(centerX, centerY, cardSize.Width, cardSize.Height, 22, 20, 26, 245);
-                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(5.0f), cardSize.Height - LayoutHeight(5.0f), 151, 104, 51, 255);
-                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(10.0f), cardSize.Height - LayoutHeight(10.0f), 42, 42, 74, 255);
-                DrawRect(centerX, centerY, LayoutWidth(4.0f), cardSize.Height - LayoutHeight(18.0f), 202, 170, 100, 255);
-                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(18.0f), LayoutHeight(4.0f), 202, 170, 100, 255);
-                DrawRect(centerX, centerY, LayoutWidth(15.0f), LayoutHeight(15.0f), 218, 193, 135, 255);
-                DrawRect(centerX, centerY, LayoutWidth(9.0f), LayoutHeight(9.0f), 42, 42, 74, 255);
+                DrawRect(centerX, centerY, cardSize.Width - LayoutWidth(2.0f), cardSize.Height - LayoutHeight(2.0f), 202, 170, 100, 255);
+                if (_opponentBackSprites[i] != null)
+                    _opponentBackSprites[i].Draw();
             }
         }
 
@@ -1312,6 +1383,23 @@ namespace TrucoRDR2
                         opponentCards[i].TextureName,
                         LayoutSize(OpponentBackWidth, OpponentBackHeight),
                         _opponentCardBackPositions[i]);
+                }
+            }
+            else
+            {
+                // Use the custom YTD texture for the hidden hand instead of a drawn pattern.
+                int opponentCount = Math.Min(3, round.OpponentCards.Count);
+                SizeF backSize = LayoutSize(OpponentBackWidth - 8.0f, OpponentBackHeight - 8.0f);
+                for (int i = 0; i < opponentCount; i++)
+                {
+                    PointF position = _opponentCardBackPositions[i];
+                    _opponentBackSprites[i] = new Sprite(
+                        _textureDictionary,
+                        OpponentBackTextureName,
+                        backSize,
+                        new PointF(
+                            position.X + LayoutWidth(4.0f),
+                            position.Y + LayoutHeight(4.0f)));
                 }
             }
 
@@ -1470,19 +1558,38 @@ namespace TrucoRDR2
 
         private void DrawTextOnly()
         {
-            UpdateText();
-            _scoreboard.Draw();
-            _roundInfo.Draw();
-            _announcement.Draw();
             DrawOpponentCardBacks();
-            _handTitle.Draw();
-            _status.Draw();
+            DrawHandTitleSurface();
+            DrawPlayedLabelSurfaces();
+            DrawHandLabelSurfaces();
+            DrawStatusSurface();
+
+            DrawTextElement(_header);
+            DrawTextElement(_instructions);
+            DrawTextElement(_scoreboard);
+            DrawTextElement(_roundInfo);
+            DrawTextElement(_announcement);
+            DrawTextElement(_handTitle);
+            for (int i = 0; i < _playedLabels.Length; i++)
+                DrawTextElement(_playedLabels[i]);
+            DrawHandLabels();
+            DrawTextElement(_status);
         }
 
         private void DrawHandLabels()
         {
             for (int i = 0; i < _handLabels.Length; i++)
-                _handLabels[i].Draw();
+                DrawTextElement(_handLabels[i]);
+        }
+
+        private static void DrawTextElement(TextElement element)
+        {
+            if (element == null)
+                return;
+
+            // Force the expected UI layer before each TextElement draw.
+            GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(4);
+            element.Draw();
         }
 
         private static string FormatTrick(TrucoTrick trick)
@@ -1517,6 +1624,15 @@ namespace TrucoRDR2
                 {
                     _playedSprites[i].Dispose();
                     _playedSprites[i] = null;
+                }
+            }
+
+            for (int i = 0; i < _opponentBackSprites.Length; i++)
+            {
+                if (_opponentBackSprites[i] != null)
+                {
+                    _opponentBackSprites[i].Dispose();
+                    _opponentBackSprites[i] = null;
                 }
             }
         }
