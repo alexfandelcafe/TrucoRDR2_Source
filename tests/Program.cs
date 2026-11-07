@@ -32,6 +32,7 @@ internal static class Program
         Run("Match checkpoint round-trips", MatchCheckpointRoundTrip);
         Run("Restoring an active match preserves score and mano", RestoreActiveMatch);
         Run("Restoring a finished match preserves winner", RestoreCompletedMatch);
+        Run("Restored flor can correctly finish the match", RestoreFlorCanWinMatch);
         Run("Corrupt checkpoint is ignored", CorruptCheckpointIsIgnored);
 
         Console.WriteLine();
@@ -338,6 +339,30 @@ internal static class Program
         Equal(TrucoPlayer.Player, restored.Winner.Value);
         True(restored.Round != null && restored.Round.Tricks.Count == 0,
             "La restauración no debe inventar bazas previas.");
+    }
+
+    private static void RestoreFlorCanWinMatch()
+    {
+        int seed = -1;
+        for (int candidate = 0; candidate < 10000; candidate++)
+        {
+            TrucoRound probe = new TrucoRound(
+                TrucoPlayer.Player, new Random(candidate), 30, 27, 10, true);
+            if (probe.PlayerHadFlor && !probe.OpponentHadFlor)
+            {
+                seed = candidate;
+                break;
+            }
+        }
+
+        True(seed >= 0, "No se encontró una mano reproducible con flor solo del jugador.");
+        TrucoMatchProgress saved = new TrucoMatchProgress(
+            30, 27, 10, TrucoPlayer.Player, true, false, null);
+        TrucoMatch restored = new TrucoMatch(saved, new Random(seed));
+
+        True(restored.IsComplete, "La flor automática debía cerrar la partida.");
+        Equal(TrucoPlayer.Player, restored.Winner.Value);
+        Equal(30, restored.PlayerScore);
     }
 
     private static void CorruptCheckpointIsIgnored()
