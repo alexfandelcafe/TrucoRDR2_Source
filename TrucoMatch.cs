@@ -53,7 +53,11 @@ namespace TrucoRDR2
             PlayerScore = playerScore;
             OpponentScore = opponentScore;
             Mano = mano;
-            StartRound();
+            if (isComplete)
+                Round = new TrucoRound(Mano, _random, TargetPoints, PlayerScore, OpponentScore, false);
+            else
+                StartRound();
+
             IsComplete = isComplete;
             Winner = winner;
             LastScoreEvent = isComplete ? "Partida restaurada: resultado final." : "Partida restaurada desde el último cierre de mano.";
