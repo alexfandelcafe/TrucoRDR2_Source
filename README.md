@@ -137,7 +137,7 @@ La mesa muestra el tanteador, la etapa de malas/buenas, la mano, las bazas, las 
 
 La implementación de fuentes sigue el formato de texto enriquecido de RDR2 (`<FONT FACE='$title'>…</FONT>`) documentado en [RDR2Mods NativeDB](https://www.rdr2mods.com/nativedb/index/hud/_draw_text-r1623/) y en [el ejemplo de uso de fuentes nativas](https://www.rdr2mods.com/forums/topic/649-changing-draw_text-font/).
 
-**Nota sobre parpadeo del texto:** se ha reportado un problema conocido en ScriptHookRDR2DotNet V2 por el que `TextElement` puede parpadear aunque se dibuje cada frame; agregar fondos no lo corrige. La solución temporal reportada para ese framework es abrir su consola con `F8`, ejecutar `Help()` y cerrar la consola. No puedo confirmar que esa solución aplique a todas las versiones. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; la escala final se ajustará según las pruebas en el juego.
+El mod ya no usa `TextElement.Draw()` para pintar etiquetas: usa `HUD._DISPLAY_TEXT` y las etiquetas de fuentes integradas en el juego, con sombra de texto nativa. La distribución usa un diseño de referencia 1920×1080 y se adapta con letterboxing a proporciones distintas de 16:9; el tamaño final de fuente y la composición requieren prueba dentro del juego.
 
 ## Integración y comportamiento
 
