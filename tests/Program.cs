@@ -246,8 +246,8 @@ internal static class Program
         True(!TrucoAi.ShouldCallTruco(26, 10, 0, 30), "El rival que lidera debería exigir más fuerza.");
         True(TrucoAi.ShouldFold(8, 2, 28, 20, 30), "Con ventaja y mano débil puede conceder.");
         True(!TrucoAi.ShouldFold(8, 2, 20, 28, 30), "No debería conceder estando abajo.");
-        True(TrucoAi.ShouldAcceptTruco(24, TrucoCall.Truco, 0, 10, 30), "Debe asumir más riesgo si está perdiendo.");
-        True(!TrucoAi.ShouldAcceptTruco(24, TrucoCall.Truco, 10, 0, 30), "Debe proteger una ventaja.");
+        True(TrucoAi.ShouldAcceptTruco(22, TrucoCall.Truco, 0, 10, 30), "Debe asumir más riesgo si está perdiendo.");
+        True(!TrucoAi.ShouldAcceptTruco(22, TrucoCall.Truco, 10, 0, 30), "Debe proteger una ventaja.");
     }
 
     private static void SettingsPersistence()
