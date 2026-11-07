@@ -1255,13 +1255,8 @@ namespace TrucoRDR2
                     return;
 
             int count = Math.Min(3, _match.Round.OpponentCards.Count);
-            SizeF cardSize = LayoutSize(OpponentBackWidth, OpponentBackHeight);
             for (int i = 0; i < count; i++)
             {
-                PointF position = _opponentCardBackPositions[i];
-                float centerX = position.X + cardSize.Width / 2.0f;
-                float centerY = position.Y + cardSize.Height / 2.0f;
-
                 // Draw only the supplied texture; no artificial frame or color plate.
                 if (_opponentBackSprites[i] != null)
                     _opponentBackSprites[i].Draw();
