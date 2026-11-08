@@ -233,7 +233,7 @@ namespace TrucoRDR2
                 {
                     _lastWorldInteractionError = _worldInteraction.LastError;
                     WriteDiagnostic("Error de interacción/prompt de Valentine: " + _lastWorldInteractionError);
-                    Screen.PrintSubtitle("No se pudo preparar el prompt del truco. Revisa scripts\\TrucoRDR2.log.");
+                    RDR2.UI.Screen.PrintSubtitle("No se pudo preparar el prompt del truco. Revisa scripts\\TrucoRDR2.log.");
                 }
             }
             else
