@@ -28,8 +28,8 @@ namespace TrucoRDR2
         private const string ChairModelName = "p_chair02x";
 
         private const float TableHeading = 90.0f;
-        private const float PlayerHeading = 90.0f;
-        private const float OpponentHeading = 270.0f;
+        private const float PlayerHeading = 270.0f;
+        private const float OpponentHeading = 90.0f;
         private const float InteractionRadius = 3.2f;
         private const double SeatPreparationSeconds = 1.8;
         private const double PlayerScenarioFallbackSeconds = 0.75;
@@ -38,6 +38,8 @@ namespace TrucoRDR2
         private readonly uint _playerSeatScenario = Game.Joaat("PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE");
         private readonly uint _genericSeatScenario = Game.Joaat("GENERIC_SEAT_CHAIR_TABLE_SCENARIO");
 
+        private Vector3 _playerSeatPosition = PlayerSeat;
+        private Vector3 _opponentSeatPosition = OpponentSeat;
         private Prop _tableProp;
         private Prop _playerChairProp;
         private Prop _opponentChairProp;
@@ -131,9 +133,16 @@ namespace TrucoRDR2
                 _opponentChairProp = CreateFurnitureProp(
                     ChairModelName, OpponentSeat, OpponentHeading);
 
+                // PLACE_ENTITY_ON_GROUND_PROPERLY may adjust each prop's Z coordinate.
+                // Use the grounded chair coordinates for the seating scenarios as well.
+                Vector3 playerChairPosition = _playerChairProp.Position;
+                Vector3 opponentChairPosition = _opponentChairProp.Position;
+                _playerSeatPosition = new Vector3(PlayerSeat.X, PlayerSeat.Y, playerChairPosition.Z);
+                _opponentSeatPosition = new Vector3(OpponentSeat.X, OpponentSeat.Y, opponentChairPosition.Z);
+
                 // Spawn a dedicated opponent for this location rather than taking control
                 // of an ambient citizen. It is removed again when the player leaves the table.
-                _opponent = World.CreatePed(PedHash.a_m_m_valtownfolk_01, OpponentSeat, OpponentHeading);
+                _opponent = World.CreatePed(PedHash.a_m_m_valtownfolk_01, _opponentSeatPosition, OpponentHeading);
                 if (_opponent == null || !_opponent.Exists())
                     throw new InvalidOperationException("No se pudo crear al rival en el salón de Valentine.");
 
@@ -141,13 +150,13 @@ namespace TrucoRDR2
                 _opponent.NeverLeavesGroup = true;
                 _opponent.Heading = OpponentHeading;
                 _opponent.Task.StartScenario(
-                    _genericSeatScenario, OpponentSeat, -1, true, true);
+                    _genericSeatScenario, _opponentSeatPosition, -1, true, true);
 
                 player.Task.ClearTasks(true);
-                player.PositionNoOffset = PlayerSeat;
+                player.PositionNoOffset = _playerSeatPosition;
                 player.Heading = PlayerHeading;
                 player.Task.StartScenario(
-                    _playerSeatScenario, PlayerSeat, -1, true, true);
+                    _playerSeatScenario, _playerSeatPosition, -1, true, true);
 
                 _sessionActive = true;
                 _preparing = true;
@@ -194,6 +203,10 @@ namespace TrucoRDR2
                     "No se pudo crear el objeto '" + modelName + "'. Comprueba el modelo y la ubicación.");
 
             prop.IsMissionEntity = true;
+
+            // Props spawned inside an interior do not reliably settle just from their input Z.
+            // Snap their collision bounds to the actual floor before using their position for seating.
+            ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY(prop.Handle, true);
             return prop;
         }
 
@@ -267,7 +280,7 @@ namespace TrucoRDR2
                     // Some chair models expose only the generic scenario node. Try the
                     // generic chair/table scenario once if the player-specific one did not start.
                     player.Task.StartScenario(
-                        _genericSeatScenario, PlayerSeat, -1, true, true);
+                        _genericSeatScenario, _playerSeatPosition, -1, true, true);
                 }
             }
             catch
