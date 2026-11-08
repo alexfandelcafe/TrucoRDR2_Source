@@ -80,6 +80,7 @@ namespace TrucoRDR2
         private bool _dealAnimationActive;
         private bool _initialDealPending;
         private bool _initialDealSequenceStarted;
+        private bool _handIdleAnimationApplied;
         private int _initialDealLastTriggeredIndex = -1;
         private const int InitialDealCardCount = 6;
         private const double InitialDealCardIntervalSeconds = 0.62;
@@ -209,15 +210,27 @@ namespace TrucoRDR2
             _playedCardAnimation = null;
             _spritesCreated = false;
 
-            // Starting from the NPC prompt begins the hand immediately; no extra menu.
-            if (_match == null)
+            // First interaction shows the configuration menu; dealing begins only after Enter.
+            _showMenu = (_match == null);
+            if (_showMenu)
             {
-                StartMatch();
-                return;
+                _menuSelection = 0;
+                UpdateMenuText();
+                if (_worldInteraction != null)
+                    _worldInteraction.PlayNoCardsIdle();
+            }
+            else if (_match.Round.IsComplete)
+            {
+                if (_worldInteraction != null)
+                    _worldInteraction.PlayNoCardsIdle();
+            }
+            else
+            {
+                if (_worldInteraction != null)
+                    _worldInteraction.PlayHoldingCardsIdle();
             }
 
-            _showMenu = false;
-            SetHeaderForMenu(false);
+            SetHeaderForMenu(_showMenu);
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             UpdateHandLabels();
         }
@@ -236,6 +249,7 @@ namespace TrucoRDR2
 
         private void BeginInitialDealSequence()
         {
+            _handIdleAnimationApplied = false;
             _initialDealPending = true;
             _initialDealSequenceStarted = false;
             _initialDealLastTriggeredIndex = -1;
@@ -285,6 +299,8 @@ namespace TrucoRDR2
                 DisposeSprites();
                 _spritesCreated = false;
                 UpdateMenuText();
+                if (_worldInteraction != null)
+                    _worldInteraction.PlayNoCardsIdle();
                 return;
             }
 
@@ -691,6 +707,13 @@ namespace TrucoRDR2
             DrawTableSurface();
             AdvanceComputer();
 
+            if (_match.Round.IsComplete && _handIdleAnimationApplied)
+            {
+                if (_worldInteraction != null)
+                    _worldInteraction.PlayNoCardsIdle();
+                _handIdleAnimationApplied = false;
+            }
+
             if (!_spritesCreated)
                 RefreshSprites();
 
@@ -840,6 +863,9 @@ namespace TrucoRDR2
                 _initialDealSequenceStarted = false;
                 _dealAnimationActive = false;
                 _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
+                if (!_handIdleAnimationApplied && _worldInteraction != null)
+                    _worldInteraction.PlayHoldingCardsIdle();
+                _handIdleAnimationApplied = true;
                 RefreshSprites();
                 UpdateText();
             }
