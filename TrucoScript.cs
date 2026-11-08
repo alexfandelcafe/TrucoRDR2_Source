@@ -57,6 +57,7 @@ namespace TrucoRDR2
         private int _firstCardIndex;
         private DateTime _textureRequestTimeUtc;
         private string _lastDiagnosticState;
+        private string _lastWorldInteractionError;
 
         public TrucoScript()
         {
@@ -225,6 +226,20 @@ namespace TrucoRDR2
         private void OnTick(object sender, EventArgs e)
         {
             bool startLocationMatch = _worldInteraction.Update(_tablePreview.IsVisible || _previewEnabled);
+
+            if (!string.IsNullOrEmpty(_worldInteraction.LastError))
+            {
+                if (!string.Equals(_lastWorldInteractionError, _worldInteraction.LastError, StringComparison.Ordinal))
+                {
+                    _lastWorldInteractionError = _worldInteraction.LastError;
+                    WriteDiagnostic("Error de interacción/prompt de Valentine: " + _lastWorldInteractionError);
+                    Screen.PrintSubtitle("No se pudo preparar el prompt del truco. Revisa scripts\\TrucoRDR2.log.");
+                }
+            }
+            else
+            {
+                _lastWorldInteractionError = null;
+            }
 
             if (_worldInteraction.SessionWasInterrupted && _tablePreview.IsVisible)
             {
