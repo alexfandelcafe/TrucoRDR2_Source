@@ -193,7 +193,7 @@ namespace TrucoRDR2
                 throw new InvalidOperationException(
                     "No se pudo crear el objeto '" + modelName + "'. Comprueba el modelo y la ubicación.");
 
-            prop.MarkAsMissionEntity();
+            prop.IsMissionEntity = true;
             return prop;
         }
 
