@@ -135,7 +135,7 @@ namespace TrucoRDR2
                 _worldInteraction.IsNearSaloon && e.KeyCode == Keys.E)
             {
                 if (_worldInteraction.TryBegin())
-                    WriteDiagnostic("Interacción del salón de Valentine iniciada; preparando los asientos.");
+                    WriteDiagnostic("Interacción del salón de Valentine iniciada; creando mesa, sillas y preparando los asientos.");
                 else if (!string.IsNullOrEmpty(_worldInteraction.LastError))
                     WriteDiagnostic("No se pudo iniciar la interacción del salón: " + _worldInteraction.LastError);
 
@@ -249,7 +249,7 @@ namespace TrucoRDR2
             if (startLocationMatch)
             {
                 _tablePreview.Start();
-                WriteDiagnostic("Mesa de Valentine abierta tras preparar los asientos.");
+                WriteDiagnostic("Mesa de Valentine abierta tras crear el mobiliario y preparar los asientos.");
             }
 
             if (_tablePreview.IsVisible)
