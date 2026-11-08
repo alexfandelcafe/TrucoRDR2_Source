@@ -416,8 +416,11 @@ namespace TrucoRDR2
                     Function.Call<bool>(IsPedGettingUp, ped))
                     return false;
 
-                // If the chair task was interrupted, do not offer the interaction.
-                return Function.Call<bool>(IsPedUsingAnyScenario, ped);
+                // Scenario start was successfully requested during world setup.
+                // Do not gate the prompt on IS_PED_USING_ANY_SCENARIO: RDR2 can report
+                // false for a seated task even while its chair animation remains visible.
+                // Explicit negative-state checks above remain authoritative.
+                return _opponentScenarioStarted;
             }
             catch
             {
