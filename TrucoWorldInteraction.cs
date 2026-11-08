@@ -40,11 +40,14 @@ namespace TrucoRDR2
         private const ulong PromptSetText = 0x5DD02A8318420DD7;
         private const ulong PromptSetPriority = 0xCA24F528D0D16289;
         private const ulong PromptSetStandardMode = 0xCC6656799977741B;
-        private const ulong PromptSetAttribute = 0x560E76D5E2E1803F;
+        private const ulong PromptSetType = 0xF4A5C4509BF923B1;
         private const ulong PromptSetVisible = 0x71215ACCFDE075EE;
         private const ulong PromptSetEnabled = 0x8A0FB4D03A630D21;
         private const ulong PromptSetGroup = 0x2F11D3A254169EA4;
         private const ulong PromptSetActiveGroupThisFrame = 0xC65A45D4453C2627;
+        private const uint InteractControlHash = 0xD51B784F;
+        // RDR2 prompt groups are numeric IDs. Keep this stable and inside the documented range.
+        private const int InteractionPromptGroupId = 0x545255;
         private const ulong PromptContextSetPoint = 0xAE84C5EE2C384FB3;
         private const ulong PromptContextSetRadius = 0x0C718001B77CA468;
         private const ulong PromptIsValid = 0x347469FBDD1589A9;
@@ -248,21 +251,20 @@ namespace TrucoRDR2
 
             try
             {
-                // INPUT_CONTEXT_Y is the default E interaction binding on PC.
-                Function.Call(PromptSetControlAction, prompt, Game.Joaat("INPUT_CONTEXT_Y"));
+                // INPUT_CONTEXT_Y is E on the default PC keyboard layout.
+                Function.Call(PromptSetType, prompt, 0);
+                Function.Call(PromptSetControlAction, prompt, InteractControlHash);
                 Function.Call(PromptSetText, prompt,
                     MISC.VAR_STRING(10, "LITERAL_STRING", "Jugar al truco"));
-                Function.Call(PromptSetPriority, prompt, 3);
+                Function.Call(PromptSetPriority, prompt, 2);
                 Function.Call(PromptSetStandardMode, prompt, false);
-                Function.Call(PromptSetAttribute, prompt, 34, true);
                 Function.Call(PromptRegisterEnd, prompt);
 
                 _interactionPrompt = prompt;
                 // Use a dedicated nonzero group rather than the NPC's generic entity group.
                 // The context point is moved with the NPC every frame, while this exclusive
                 // active group keeps other normal prompt groups from taking the screen.
-                _interactionPromptGroup =
-                    unchecked((int)Game.Joaat("TRUCO_RDR2_VALENTINE_PROMPT"));
+                _interactionPromptGroup = InteractionPromptGroupId;
 
                 Function.Call(PromptSetGroup, _interactionPrompt, _interactionPromptGroup, 0);
                 Function.Call(PromptContextSetPoint, _interactionPrompt,
