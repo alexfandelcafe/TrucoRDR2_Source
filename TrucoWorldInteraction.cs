@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using RDR2;
 using RDR2.Math;
 using RDR2.Native;
@@ -30,7 +31,6 @@ namespace TrucoRDR2
         private const float OpponentHeading = 90.0f;
 
         private const float InteractionRadius = 4.5f;
-        private const float PromptRadius = 4.0f;
         private const double SetupRetrySeconds = 3.0;
         private const double ScenarioWarmupSeconds = 1.5;
 
@@ -45,10 +45,7 @@ namespace TrucoRDR2
         private const ulong PromptSetEnabled = 0x8A0FB4D03A630D21;
         private const ulong PromptSetGroup = 0x2F11D3A254169EA4;
         private const ulong PromptGetGroupIdForTargetEntity = 0xB796970BD125FCE8;
-        private const ulong PromptSetActiveGroupThisFrame = 0xC65A45D4453C2627;
         private const uint InteractControlHash = 0xD51B784F;
-        private const ulong PromptContextSetPoint = 0xAE84C5EE2C384FB3;
-        private const ulong PromptContextSetRadius = 0x0C718001B77CA468;
         private const ulong PromptIsValid = 0x347469FBDD1589A9;
         private const ulong PromptIsActive = 0x546E342E01DE71CF;
         private const ulong PromptIsJustPressed = 0x2787CC611D3FACC5;
@@ -89,9 +86,16 @@ namespace TrucoRDR2
         private DateTime _opponentScenarioStartedUtc;
         private DateTime _nextSetupAttemptUtc;
 
+        // Optional runtime bridge: exclude only our rival from Companion Extension recruitment.
+        private static bool _companionEligibilityPatchInstalled;
+        private static DateTime _nextCompanionPatchAttemptUtc;
+        private static int _companionExcludedPedHandle;
+        private string _companionPromptIntegrationStatus = "Esperando la extensión Companion/EnRAGE.";
+
         public bool IsSessionActive { get { return _sessionActive; } }
         public bool SessionWasInterrupted { get; private set; }
         public string LastError { get; private set; }
+        public string CompanionPromptIntegrationStatus { get { return _companionPromptIntegrationStatus; } }
 
         /// <summary>
         /// Returns true on the frame the contextual prompt starts a new game.
@@ -100,6 +104,7 @@ namespace TrucoRDR2
         {
             SessionWasInterrupted = false;
             EnsureWorldSetup();
+            EnsureCompanionRecruitmentExclusion();
 
             if (_sessionActive)
             {
@@ -129,11 +134,9 @@ namespace TrucoRDR2
                 return false;
             }
 
-            // The range gate prevents this NPC's group from replacing other normal prompt
-            // groups elsewhere in the world. The context point follows the NPC.
-            UpdatePromptAnchor();
+            // The NPC's entity-focus group is activated by RDR2 itself when the player
+            // points at this ped. Do not force a global active group: that can hide the prompt.
             SetPromptEnabled(true);
-            ActivateExclusivePromptGroup();
 
             if (IsPromptActive() && IsPromptJustPressed())
                 return TryBegin(player);
@@ -163,6 +166,10 @@ namespace TrucoRDR2
             {
                 // Continue cleanup even if the NPC was already removed by the game.
             }
+
+            if (_opponent != null && _opponent.Exists() &&
+                _companionExcludedPedHandle == _opponent.Handle)
+                _companionExcludedPedHandle = 0;
 
             _opponent = null;
             _worldSetupComplete = false;
@@ -246,6 +253,164 @@ namespace TrucoRDR2
             }
         }
 
+        private void EnsureCompanionRecruitmentExclusion()
+        {
+            if (_opponent == null || !_opponent.Exists())
+                return;
+
+            _companionExcludedPedHandle = _opponent.Handle;
+            if (_companionEligibilityPatchInstalled || DateTime.UtcNow < _nextCompanionPatchAttemptUtc)
+                return;
+
+            _nextCompanionPatchAttemptUtc = DateTime.UtcNow.AddSeconds(2.0);
+
+            try
+            {
+                Type hooksType = null;
+                Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                for (int i = 0; i < assemblies.Length; i++)
+                {
+                    hooksType = assemblies[i].GetType(
+                        "EnRAGECompanionsExtension.EnRAGEHooks", false);
+                    if (hooksType != null)
+                        break;
+                }
+
+                if (hooksType == null)
+                {
+                    _companionPromptIntegrationStatus =
+                        "Extensión Companion/EnRAGE no detectada; no se aplicó exclusión.";
+                    return;
+                }
+
+                const BindingFlags staticPrivate =
+                    BindingFlags.Static | BindingFlags.NonPublic;
+                FieldInfo installedField = hooksType.GetField("_installed", staticPrivate);
+                FieldInfo harmonyField = hooksType.GetField("_harmony", staticPrivate);
+                object installed = installedField == null ? null : installedField.GetValue(null);
+                object harmony = harmonyField == null ? null : harmonyField.GetValue(null);
+                if (!(installed is bool) || !(bool)installed || harmony == null)
+                {
+                    _companionPromptIntegrationStatus =
+                        "Extensión Companion detectada; esperando que termine de inicializar.";
+                    return;
+                }
+
+                MethodInfo target = hooksType.GetMethod(
+                    "IsEligibleGenericCandidate", staticPrivate);
+                if (target == null)
+                {
+                    _companionPromptIntegrationStatus =
+                        "La versión de Companion no expone el filtro de candidatos esperado.";
+                    return;
+                }
+
+                Type harmonyMethodType = harmony.GetType().Assembly.GetType(
+                    "HarmonyLib.HarmonyMethod", false);
+                if (harmonyMethodType == null)
+                {
+                    _companionPromptIntegrationStatus =
+                        "No se encontró HarmonyLib.HarmonyMethod en Companion.";
+                    return;
+                }
+
+                MethodInfo prefix = typeof(TrucoWorldInteraction).GetMethod(
+                    "CompanionEligibilityPrefix",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                ConstructorInfo harmonyMethodConstructor = null;
+                ConstructorInfo[] constructors = harmonyMethodType.GetConstructors(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                for (int i = 0; i < constructors.Length; i++)
+                {
+                    ParameterInfo[] parameters = constructors[i].GetParameters();
+                    if (parameters.Length == 1 &&
+                        parameters[0].ParameterType.IsAssignableFrom(typeof(MethodInfo)))
+                    {
+                        harmonyMethodConstructor = constructors[i];
+                        break;
+                    }
+                }
+
+                if (prefix == null || harmonyMethodConstructor == null)
+                {
+                    _companionPromptIntegrationStatus =
+                        "No se pudo preparar el filtro Harmony para Companion.";
+                    return;
+                }
+
+                object harmonyPrefix = harmonyMethodConstructor.Invoke(new object[] { prefix });
+                MethodInfo patchMethod = null;
+                MethodInfo[] harmonyMethods = harmony.GetType().GetMethods(
+                    BindingFlags.Instance | BindingFlags.Public);
+                for (int i = 0; i < harmonyMethods.Length; i++)
+                {
+                    if (!string.Equals(harmonyMethods[i].Name, "Patch", StringComparison.Ordinal))
+                        continue;
+
+                    ParameterInfo[] parameters = harmonyMethods[i].GetParameters();
+                    if (parameters.Length >= 2 &&
+                        parameters[0].ParameterType.IsAssignableFrom(typeof(MethodInfo)) &&
+                        parameters[1].ParameterType == harmonyMethodType)
+                    {
+                        patchMethod = harmonyMethods[i];
+                        break;
+                    }
+                }
+
+                if (patchMethod == null)
+                {
+                    _companionPromptIntegrationStatus =
+                        "La API Harmony cargada por Companion no ofrece la firma Patch esperada.";
+                    return;
+                }
+
+                ParameterInfo[] patchParameters = patchMethod.GetParameters();
+                object[] patchArguments = new object[patchParameters.Length];
+                patchArguments[0] = target;
+                patchArguments[1] = harmonyPrefix;
+                for (int i = 2; i < patchArguments.Length; i++)
+                    patchArguments[i] = null;
+
+                patchMethod.Invoke(harmony, patchArguments);
+                _companionEligibilityPatchInstalled = true;
+                _companionPromptIntegrationStatus =
+                    "Cabalga conmigo excluido únicamente para el NPC del truco.";
+
+                // If Companion had already created its prompt before this patch was installed,
+                // remove that one stale prompt now. The Harmony filter prevents its recreation.
+                FieldInfo promptForField = hooksType.GetField("_genericPromptFor", staticPrivate);
+                MethodInfo hidePrompt = hooksType.GetMethod(
+                    "HideGenericRecruitPrompt", staticPrivate);
+                if (promptForField != null && hidePrompt != null)
+                {
+                    object promptFor = promptForField.GetValue(null);
+                    if (promptFor != null &&
+                        Convert.ToInt32(promptFor) == _opponent.Handle)
+                        hidePrompt.Invoke(null, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                _companionPromptIntegrationStatus =
+                    "No se pudo excluir el NPC del prompt Companion: " + ex.GetBaseException().Message;
+            }
+        }
+
+        // Harmony prefix for Companion Extension's candidate filter. It rejects exactly this
+        // instance, leaving recruitment and prompts for every other world ped unchanged.
+        private static bool CompanionEligibilityPrefix(Ped __2, ref bool __result)
+        {
+            if (__2 != null && __2.Exists() &&
+                _companionExcludedPedHandle != 0 &&
+                __2.Handle == _companionExcludedPedHandle)
+            {
+                __result = false;
+                return false;
+            }
+
+            return true;
+        }
+
         private void CreateInteractionPrompt()
         {
             int prompt = Function.Call<int>(PromptRegisterBegin);
@@ -273,9 +438,6 @@ namespace TrucoRDR2
                         "RDR2 no devolvió un grupo de interacción válido para el NPC.");
 
                 Function.Call(PromptSetGroup, _interactionPrompt, _interactionPromptGroup, 0);
-                Function.Call(PromptContextSetPoint, _interactionPrompt,
-                    _opponent.Position.X, _opponent.Position.Y, _opponent.Position.Z + 0.55f);
-                Function.Call(PromptContextSetRadius, _interactionPrompt, PromptRadius);
 
                 SetPromptEnabled(false);
             }
@@ -292,44 +454,6 @@ namespace TrucoRDR2
                 _interactionPrompt = 0;
                 _interactionPromptGroup = 0;
                 throw;
-            }
-        }
-
-        private void UpdatePromptAnchor()
-        {
-            try
-            {
-                if (_interactionPrompt == 0 || _opponent == null || !_opponent.Exists())
-                    return;
-
-                Function.Call(PromptContextSetPoint, _interactionPrompt,
-                    _opponent.Position.X, _opponent.Position.Y, _opponent.Position.Z + 0.55f);
-                Function.Call(PromptContextSetRadius, _interactionPrompt, PromptRadius);
-            }
-            catch
-            {
-                // A disappearing entity is handled by IsOpponentAvailable on the next tick.
-            }
-        }
-
-        private void ActivateExclusivePromptGroup()
-        {
-            if (_interactionPromptGroup == 0 || _interactionPrompt == 0)
-                return;
-
-            try
-            {
-                // RDR2 normal prompt groups are exclusive. We activate the NPC's own
-                // target group while the player is beside the rival, so this prompt wins
-                // over unrelated normal prompt groups.
-                Function.Call(PromptSetActiveGroupThisFrame,
-                    unchecked((uint)_interactionPromptGroup),
-                    MISC.VAR_STRING(10, "LITERAL_STRING", "SALÓN DE VALENTINE"),
-                    1, 0, 0, 0);
-            }
-            catch
-            {
-                // The prompt remains gated by its context point and NPC state.
             }
         }
 
