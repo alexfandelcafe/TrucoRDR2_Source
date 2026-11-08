@@ -672,6 +672,16 @@ namespace TrucoRDR2
             _textureDictionaryLoaded = dictionaryLoaded;
             if (_initialDealPending)
             {
+                // Do not start the animated card deal until the player's chair-entry
+                // scenario has settled; the menu may be opened during this warm-up.
+                if (_worldInteraction != null && !_worldInteraction.IsPlayerSeatedReady)
+                {
+                    DrawTableSurface();
+                    SetCaption(_status, "Terminando de sentarte...");
+                    DrawTextElement(_status);
+                    return;
+                }
+
                 if (!dictionaryLoaded)
                 {
                     DrawTableSurface();
