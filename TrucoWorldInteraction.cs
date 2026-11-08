@@ -243,7 +243,7 @@ namespace TrucoRDR2
             player.Task.StartScenario(
                 _playerSeatScenario, _playerSeatPosition, -1, true, true);
             _opponent.Task.StartScenario(
-                _genericSeatScenario, _opponentSeatPosition, -1, true, true);
+                _opponentSeatScenario, _opponentSeatPosition, -1, true, true);
         }
 
         private bool AreBothCharactersNearApproach()
