@@ -149,7 +149,7 @@ La escena del salón de Valentine se prepara al inicializar el script, no al pul
 - Al cerrar con Esc, la partida termina pero los muebles y el rival permanecen en el mundo. Al descargar/abortar el script se eliminan el prompt, los objetos y el rival.
 - Ctrl+F9 sigue disponible como atajo de desarrollo para abrir la interfaz sin usar el prompt del NPC.
 
-El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). Las sillas quedan aproximadamente a 1,0 m a cada lado del centro de la mesa; el punto de sentado se calcula con `GetOffsetPosition` usando y = -0,05 y z = 0,50. La escena y el prompt requieren validación visual en el juego.
+El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). Las sillas quedan aproximadamente a 1,0 m a cada lado del centro de la mesa; el punto de sentado se calcula con `GetOffsetPosition` usando y = -0,05 y z = 0,50. El usuario confirmó visualmente que la mesa, las sillas y el escenario de sentado actuales funcionan correctamente; la secuencia de reparto y las animaciones secundarias nuevas requieren prueba dentro del juego.
 
 ### Rival controlado por IA
 
@@ -177,4 +177,4 @@ La distribución usa un diseño de referencia 1920×1080 y se adapta con letterb
 
 ## Nota sobre validación
 
-El código está preparado para compilar contra la API V2.2.0, pero en este entorno no está instalado MSBuild/Visual Studio ni el runtime del juego, así que no puedo certificar una compilación ni probar la carga real del YTD aquí. El proyecto reporta un error de compilación explícito si no encuentra la DLL de API requerida.
+El código está preparado para compilar contra la API V2.2.0, pero en este entorno no está instalado MSBuild/Visual Studio ni el runtime del juego, así que no puedo certificar una compilación ni probar la secuencia nueva de reparto dentro de RDR2. La secuencia espera la carga de `trucor2_cards.ytd`; si falta, deja la mesa visible con un mensaje y no permite elegir cartas invisibles. El proyecto reporta un error de compilación explícito si no encuentra la DLL de API requerida.
