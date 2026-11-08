@@ -44,7 +44,7 @@ namespace TrucoRDR2
         private const double PromptIntervalSeconds = 2.5;
 
         private readonly uint _playerSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR_MP_PLAYER");
-        private readonly uint _genericSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
+        private readonly uint _opponentSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
 
         private Vector3 _playerSeatPosition;
         private Vector3 _opponentSeatPosition;
