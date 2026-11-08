@@ -364,9 +364,8 @@ namespace TrucoRDR2
             if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            // On current RDR2 builds HUD._DISPLAY_TEXT and HUD._SET_TEXT_COLOR are
-            // no-op natives. ScriptHookRDR2DotNet V2's TextElement uses the UIDEBUG
-            // background-text natives instead, so use that supported path directly.
+            // Keep the same UIDEBUG background-text path used by TextElement in SHVDotNet V2.
+            // The legacy HUD _DISPLAY_TEXT/_SET_TEXT_COLOR natives are inactive on current builds.
             PointF position = element.Position;
             float textWidth = EstimateTextWidth(element.Caption, element.Scale);
             float x = position.X;
@@ -380,14 +379,18 @@ namespace TrucoRDR2
             if (screenWidth <= 0.0f || screenHeight <= 0.0f)
                 return;
 
+            try
+            {
+                // Reassert the overlay's draw layer immediately before issuing text commands.
+                GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(3);
+            }
+            catch
+            {
+                // Keep drawing if this optional graphics native is unavailable.
+            }
+
             UIDEBUG._BG_SET_TEXT_SCALE(element.Scale, element.Scale);
             UIDEBUG._BG_SET_TEXT_COLOR(element.Color.R, element.Color.G, element.Color.B, element.Color.A);
-
-            if (element.Shadow)
-                Function.Call(0x1BE39DBAA7263CA5UL, 2, 0, 0, 0, 255); // SET_TEXT_DROPSHADOW
-            else
-                Function.Call(0x1BE39DBAA7263CA5UL, 0, 0, 0, 0, 0);
-
             string renderedText = MISC.VAR_STRING(10, "LITERAL_STRING", element.Caption);
             UIDEBUG._BG_DISPLAY_TEXT(renderedText, x / screenWidth, position.Y / screenHeight);
         }
