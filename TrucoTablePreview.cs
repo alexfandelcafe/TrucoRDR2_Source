@@ -319,9 +319,26 @@ namespace TrucoRDR2
             _initialDealPending = false;
             _initialDealSequenceStarted = false;
             _initialDealLastTriggeredIndex = -1;
+            _dealAnimationStartUtc = DateTime.MinValue;
             _playedCardAnimation = null;
+            _nextComputerActionUtc = DateTime.MaxValue;
             DisposeSprites();
-            // Keep the match, score and current hand so reopening the table resumes play.
+
+            // Escape ends the session and discards the complete match instead of resuming it.
+            _match = null;
+            _showMenu = true;
+            _menuSelection = 0;
+            _handIdleAnimationApplied = false;
+            SetHeaderForMenu(true);
+            UpdateMenuText();
+            UpdateHandLabels();
+
+            if (_worldInteraction != null)
+            {
+                _worldInteraction.ClearPhysicalHandCards();
+                _worldInteraction.CloseTableSession();
+            }
+
             _textureRequestSent = false;
             _spritesCreated = false;
             _textureDictionaryLoaded = false;
@@ -720,7 +737,10 @@ namespace TrucoRDR2
             if (_match.Round.IsComplete && _handIdleAnimationApplied)
             {
                 if (_worldInteraction != null)
+                {
+                    _worldInteraction.ClearPhysicalHandCards();
                     _worldInteraction.PlayNoCardsIdle();
+                }
                 _handIdleAnimationApplied = false;
             }
 
@@ -1684,6 +1704,16 @@ namespace TrucoRDR2
 
         private void RefreshSprites()
         {
+            if (_worldInteraction != null)
+            {
+                if (_match != null && _match.Round != null && !_initialDealPending &&
+                    !_match.IsComplete && !_match.Round.IsComplete)
+                    _worldInteraction.SetPhysicalHandCards(
+                        _match.Round.PlayerCards, _match.Round.OpponentCards);
+                else
+                    _worldInteraction.ClearPhysicalHandCards();
+            }
+
             DisposeSprites();
             if (_match == null || _match.Round == null || !_textureDictionaryLoaded)
             {
