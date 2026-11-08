@@ -7,20 +7,29 @@ using RDR2.UI;
 namespace TrucoRDR2
 {
     /// <summary>
-    /// First world interaction prototype: one fixed table inside the Valentine saloon.
-    /// The position is a known saloon coordinate; the two seat offsets must be verified in-game.
+    /// World interaction prototype for one fixed table in the Valentine saloon.
+    /// Spawns a real table and two chairs before seating the player and the opponent.
+    /// The exact placement should be calibrated in-game.
     /// </summary>
     internal sealed class TrucoWorldInteraction
     {
-        // Valentine Saloon world coordinate. Kept as constants so the first in-game
-        // calibration can adjust the trigger and the two seat positions independently.
+        // Valentine Saloon interaction point. Furniture and seat offsets are kept here
+        // so their placement can be calibrated without changing the match/UI code.
         private static readonly Vector3 LocationCenter =
             new Vector3(-307.7149f, 802.8571f, 118.9794f);
+        private static readonly Vector3 TablePosition = LocationCenter;
         private static readonly Vector3 PlayerSeat =
             new Vector3(-309.05f, 802.8571f, 118.9794f);
         private static readonly Vector3 OpponentSeat =
             new Vector3(-306.38f, 802.8571f, 118.9794f);
 
+        // Valid RDR2 object model names: a plain wooden table and two matching chairs.
+        private const string TableModelName = "p_table01x";
+        private const string ChairModelName = "p_chair02x";
+
+        private const float TableHeading = 90.0f;
+        private const float PlayerHeading = 90.0f;
+        private const float OpponentHeading = 270.0f;
         private const float InteractionRadius = 3.2f;
         private const double SeatPreparationSeconds = 1.8;
         private const double PlayerScenarioFallbackSeconds = 0.75;
@@ -29,6 +38,9 @@ namespace TrucoRDR2
         private readonly uint _playerSeatScenario = Game.Joaat("PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE");
         private readonly uint _genericSeatScenario = Game.Joaat("GENERIC_SEAT_CHAIR_TABLE_SCENARIO");
 
+        private Prop _tableProp;
+        private Prop _playerChairProp;
+        private Prop _opponentChairProp;
         private Ped _opponent;
         private Vector3 _originalPlayerPosition;
         private float _originalPlayerHeading;
@@ -109,21 +121,31 @@ namespace TrucoRDR2
                 _originalPlayerHeading = player.Heading;
                 _hasOriginalPlayerTransform = true;
 
+                // Create real world furniture first. Do not start any sitting animation
+                // unless all three props exist, otherwise the characters can appear to sit
+                // in mid-air as in the previous prototype.
+                _tableProp = CreateFurnitureProp(
+                    TableModelName, TablePosition, TableHeading);
+                _playerChairProp = CreateFurnitureProp(
+                    ChairModelName, PlayerSeat, PlayerHeading);
+                _opponentChairProp = CreateFurnitureProp(
+                    ChairModelName, OpponentSeat, OpponentHeading);
+
                 // Spawn a dedicated opponent for this location rather than taking control
                 // of an ambient citizen. It is removed again when the player leaves the table.
-                _opponent = World.CreatePed(PedHash.a_m_m_valtownfolk_01, OpponentSeat, 270.0f);
+                _opponent = World.CreatePed(PedHash.a_m_m_valtownfolk_01, OpponentSeat, OpponentHeading);
                 if (_opponent == null || !_opponent.Exists())
                     throw new InvalidOperationException("No se pudo crear al rival en el salón de Valentine.");
 
                 _opponent.BlockPermanentEvents = true;
                 _opponent.NeverLeavesGroup = true;
-                _opponent.Heading = 270.0f;
+                _opponent.Heading = OpponentHeading;
                 _opponent.Task.StartScenario(
                     _genericSeatScenario, OpponentSeat, -1, true, true);
 
                 player.Task.ClearTasks(true);
                 player.PositionNoOffset = PlayerSeat;
-                player.Heading = 90.0f;
+                player.Heading = PlayerHeading;
                 player.Task.StartScenario(
                     _playerSeatScenario, PlayerSeat, -1, true, true);
 
@@ -132,7 +154,7 @@ namespace TrucoRDR2
                 _playerScenarioFallbackAttempted = false;
                 _preparationStartedUtc = DateTime.UtcNow;
                 IsNearSaloon = false;
-                Screen.PrintSubtitle("Tomando asiento para jugar al truco...");
+                Screen.PrintSubtitle("Preparando la mesa y tomando asiento...");
                 return true;
             }
             catch (Exception ex)
@@ -158,6 +180,23 @@ namespace TrucoRDR2
             EndSession();
         }
 
+        private static Prop CreateFurnitureProp(string modelName, Vector3 position, float heading)
+        {
+            Model model = new Model(Game.Joaat(modelName));
+            Prop prop = World.CreatePropNoOffset(
+                model,
+                position,
+                new Vector3(0.0f, 0.0f, heading),
+                false);
+
+            if (prop == null || !prop.Exists())
+                throw new InvalidOperationException(
+                    "No se pudo crear el objeto '" + modelName + "'. Comprueba el modelo y la ubicación.");
+
+            prop.MarkAsMissionEntity();
+            return prop;
+        }
+
         private void UpdateProximityPrompt()
         {
             try
@@ -172,7 +211,7 @@ namespace TrucoRDR2
                 IsNearSaloon = IsInsideInteractionRange(player.Position);
                 if (IsNearSaloon && DateTime.UtcNow >= _nextPromptUtc)
                 {
-                    Screen.PrintSubtitle("Salón de Valentine: pulsa E para sentarte y jugar al truco.");
+                    Screen.PrintSubtitle("Salón de Valentine: pulsa E para crear la mesa y jugar al truco.");
                     _nextPromptUtc = DateTime.UtcNow.AddSeconds(PromptIntervalSeconds);
                 }
             }
@@ -225,8 +264,8 @@ namespace TrucoRDR2
                 Ped player = Game.Player.Character;
                 if (player != null && player.Exists() && !player.IsUsingScenario)
                 {
-                    // Some chairs expose only the generic scenario node. Try it once if
-                    // the player-specific dynamic chair scenario did not start.
+                    // Some chair models expose only the generic scenario node. Try the
+                    // generic chair/table scenario once if the player-specific one did not start.
                     player.Task.StartScenario(
                         _genericSeatScenario, PlayerSeat, -1, true, true);
                 }
@@ -258,10 +297,14 @@ namespace TrucoRDR2
             }
             catch
             {
-                // Cleanup of the opponent still proceeds if the player ped is unavailable.
+                // Cleanup of furniture and the opponent still proceeds if the player ped is unavailable.
             }
 
             _hasOriginalPlayerTransform = false;
+
+            DeleteProp(ref _playerChairProp);
+            DeleteProp(ref _opponentChairProp);
+            DeleteProp(ref _tableProp);
 
             try
             {
@@ -278,6 +321,23 @@ namespace TrucoRDR2
 
             _opponent = null;
             IsNearSaloon = false;
+        }
+
+        private static void DeleteProp(ref Prop prop)
+        {
+            try
+            {
+                if (prop != null && prop.Exists())
+                    prop.Delete();
+            }
+            catch
+            {
+                // Keep deleting the remaining props even if one object is already invalid.
+            }
+            finally
+            {
+                prop = null;
+            }
         }
     }
 }
