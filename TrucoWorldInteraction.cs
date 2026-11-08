@@ -252,8 +252,8 @@ namespace TrucoRDR2
                 Function.Call(PromptSetControlAction, prompt, Game.Joaat("INPUT_CONTEXT_Y"));
                 Function.Call(PromptSetText, prompt,
                     MISC.VAR_STRING(10, "LITERAL_STRING", "Jugar al truco"));
-                Function.Call(PromptSetPriority, prompt, 2);
-                Function.Call(PromptSetStandardMode, prompt, true);
+                Function.Call(PromptSetPriority, prompt, 3);
+                Function.Call(PromptSetStandardMode, prompt, false);
                 Function.Call(PromptSetAttribute, prompt, 34, true);
                 Function.Call(PromptRegisterEnd, prompt);
 
@@ -386,10 +386,15 @@ namespace TrucoRDR2
                 if (_opponent.IsDeadOrDying ||
                     _opponent.IsInCombat ||
                     _opponent.IsCowering ||
+                    _opponent.IsIntimidated ||
                     _opponent.IsRespondingToThreat ||
                     _opponent.IsIncapacitated ||
                     _opponent.IsWrithing ||
+                    _opponent.IsDrunk ||
                     _opponent.IsBeingArrested ||
+                    _opponent.IsExitingScenario ||
+                    _opponent.IsGettingUp ||
+                    _opponent.IsHogtying ||
                     _opponent.IsLassoed ||
                     Function.Call<bool>(IsEntityDead, ped) ||
                     Function.Call<bool>(IsEntityOnFire, ped) ||
