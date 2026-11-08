@@ -78,7 +78,6 @@ namespace TrucoRDR2
         private DateTime _dealAnimationStartUtc;
         private bool _dealAnimationActive;
         private CardAnimation _playedCardAnimation;
-        private int _lastObservedPlayerHealth;
 
         public bool IsVisible { get { return _visible; } }
         public bool IsRoundComplete
@@ -190,7 +189,6 @@ namespace TrucoRDR2
         public void Start()
         {
             _visible = true;
-            _lastObservedPlayerHealth = ReadPlayerHealth();
 
             if (_match == null)
             {
@@ -561,21 +559,17 @@ namespace TrucoRDR2
                 // Rendering should continue if this optional layer adjustment is unavailable.
             }
 
-            // The world keeps running behind the overlay. If combat or a fall damages the player,
-            // close the overlay but retain the match state so Ctrl+F9 can reopen it safely.
+            // Keep the table open through minor damage or bumps while the player is walking
+            // into the chair. Only death interrupts the overlay; a small health drop must not
+            // close the menu during the seating animation.
             try
             {
-                int health = ReadPlayerHealth();
-                bool dead = RDR2.Game.Player.IsDead;
-                if (dead || (_lastObservedPlayerHealth > 0 && health > 0 && health < _lastObservedPlayerHealth))
+                if (RDR2.Game.Player.IsDead)
                 {
                     Close();
-                    RDR2.UI.Screen.PrintSubtitle("Partida interrumpida por daño. Usá " + _tableToggleText + " para volver.");
+                    RDR2.UI.Screen.PrintSubtitle("Partida interrumpida porque el jugador murió.");
                     return;
                 }
-
-                if (health > 0)
-                    _lastObservedPlayerHealth = health;
             }
             catch
             {
@@ -1704,18 +1698,6 @@ namespace TrucoRDR2
             }
 
             return rank + " de " + card.Suit.ToString().ToLowerInvariant();
-        }
-
-        private static int ReadPlayerHealth()
-        {
-            try
-            {
-                return RDR2.Game.Player.Character.Health;
-            }
-            catch
-            {
-                return -1;
-            }
         }
 
         private void DrawTextOnly()
