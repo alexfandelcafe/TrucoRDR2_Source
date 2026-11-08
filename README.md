@@ -2,7 +2,7 @@
 
 Este proyecto C# compila como `TrucoRDR2.dll` para ScriptHookRDR2DotNet V2.2.0 / .NET Framework 4.8.
 
-**Alcance de esta build:** carga y prueba las 40 texturas y ofrece una partida mano a mano de truco argentino con tanteador, apuestas de envido y truco, flor opcional, y un rival con estrategia básica. La IA es heurística y todavía necesita ajustes a partir de las pruebas dentro del juego.
+**Alcance de esta build:** carga y prueba las 40 texturas y ofrece una partida mano a mano de truco argentino con tanteador, apuestas de envido y truco, flor opcional, IA heurística mejorada y un prototipo de interacción física en una única ubicación: el salón de Valentine.
 
 ## Requisitos
 
@@ -126,6 +126,18 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 - Al terminar la partida, `Enter` vuelve al menú; desde ahí podés iniciar otra.
 - `Esc` cierra la mesa.
 - La combinación configurada en `[Controls]` abre/cierra la mesa. El valor predeterminado es `Ctrl+F9`; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
+
+### Interacción con el mundo (prototipo de una ubicación)
+
+La primera ubicación está fijada al salón de Valentine. El mod detecta al jugador cerca del punto de interacción, muestra un subtítulo y permite iniciar con `E`.
+
+- Al iniciar se guarda la posición y orientación originales del jugador.
+- Se crea un rival temporal con el modelo de un habitante de Valentine y se intenta sentar a ambos personajes usando los escenarios `PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE` y `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`.
+- Hay una breve transición durante la que los controles quedan bloqueados; después se abre la mesa de truco existente.
+- Al cerrar con `Esc`, el script limpia las tareas, elimina el rival temporal y restaura al jugador si sigue vivo, fuera de combate y cerca de la mesa.
+- `Ctrl+F9` sigue disponible como acceso directo de desarrollo para abrir la interfaz sin desplazarse al salón.
+
+El punto de referencia del salón usa las coordenadas de mapa `(-307.715, 802.857, 118.979)`. Los dos desplazamientos de asiento son aproximados y deben calibrarse en una partida real: el script no puede verificar desde GitHub si las sillas y los nodos de escenario de esa instalación coinciden exactamente. Esta primera versión no detecta cualquier mesa del mundo ni toma el control de peatones ambientales; crea y administra su propio rival temporal.
 
 ### Rival controlado por IA
 
