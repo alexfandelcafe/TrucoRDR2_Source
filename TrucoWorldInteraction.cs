@@ -29,6 +29,10 @@ namespace TrucoRDR2
 
         private const string TableModelName = "p_table06x";
         private const string ChairModelName = "p_windsorchair03x";
+        private const string DeckPropModelName = "p_cardssplit01x_val";
+        private const string DeckFallbackModelName = "p_cards01x";
+        private const string HiddenCardPropModelName = "p_crd_joker01x_val";
+        private const string GenericCardPropModelName = "p_cs_pokercard01x";
         private const float TableHeading = 90.0f;
         private const float PlayerChairHeading = 90.0f;
         private const float OpponentChairHeading = 270.0f;
@@ -64,6 +68,9 @@ namespace TrucoRDR2
         private const ulong IsPedHogtied = 0x3AA24CCC0D451379;
         private const ulong IsPedFallingOver = 0x3E592D0486DEC0F6;
         private const ulong IsPedGettingUp = 0x2A74E1D5F2F00EEC;
+        // Verified RDR2 natives: clear only the secondary task; keep the NPC seat scenario.
+        private const ulong ClearPedSecondaryTaskNative = 0x176CECF6F920D707;
+        private const ulong GetEntityBoneIndexByNameNative = 0xBACA8FE9C76C124E;
 
         private readonly uint _seatScenario = Game.Joaat("GENERIC_SEAT_CHAIR_TABLE_SCENARIO");
 
@@ -72,6 +79,9 @@ namespace TrucoRDR2
         private Prop _tableProp;
         private Prop _playerChairProp;
         private Prop _opponentChairProp;
+        private Prop _deckProp;
+        private readonly List<Prop> _playerHandCardProps = new List<Prop>();
+        private readonly List<Prop> _opponentHandCardProps = new List<Prop>();
         private Ped _opponent;
 
         private int _interactionPrompt;
@@ -107,6 +117,7 @@ namespace TrucoRDR2
         private DateTime _opponentScenarioStartedUtc;
         private DateTime _playerScenarioStartedUtc;
         private DateTime _nextSetupAttemptUtc;
+        private DateTime _nextDeckPropAttemptUtc;
 
         // Optional runtime bridge: exclude only our rival from Companion Extension recruitment.
         private static bool _companionEligibilityPatchInstalled;
@@ -139,6 +150,7 @@ namespace TrucoRDR2
         {
             SessionWasInterrupted = false;
             EnsureWorldSetup();
+            EnsureDeckProp();
             EnsureCompanionRecruitmentExclusion();
             ProcessPendingCardAnimation();
 
@@ -202,6 +214,8 @@ namespace TrucoRDR2
             // treated as the excluded ped. A later Truco script instance can set a new handle.
             _companionExcludedPedHandle = 0;
 
+            ClearPhysicalHandCards();
+            DeleteProp(ref _deckProp);
             DeleteProp(ref _playerChairProp);
             DeleteProp(ref _opponentChairProp);
             DeleteProp(ref _tableProp);
@@ -251,6 +265,242 @@ namespace TrucoRDR2
                 "hold_cards_idle_a", -1, IdleAnimationFlags);
             QueuePedAnimation(_opponent, PokerBaseAnimationDictionary,
                 "hold_cards_idle_a", -1, IdleAnimationFlags);
+        }
+
+        /// <summary>
+        /// Displays the real 3D card objects in each seated player's left hand.
+        /// The opponent's cards remain face down; the player's cards use the closest
+        /// matching Valentine poker-card models available in the base game.
+        /// </summary>
+        public void SetPhysicalHandCards(
+            IList<TrucoCard> playerCards, IList<TrucoCard> opponentCards)
+        {
+            Ped player = Game.Player.Character;
+            SyncHandCardProps(_playerHandCardProps, player, playerCards, false);
+            SyncHandCardProps(_opponentHandCardProps, _opponent, opponentCards, true);
+        }
+
+        /// <summary>Removes only the cards attached to the hands, leaving the table deck.</summary>
+        public void ClearPhysicalHandCards()
+        {
+            DeleteHandCardProps(_playerHandCardProps);
+            DeleteHandCardProps(_opponentHandCardProps);
+        }
+
+        /// <summary>
+        /// Ends the table session without deleting or restarting the rival's seated scenario.
+        /// </summary>
+        public void CloseTableSession()
+        {
+            if (_sessionActive)
+                EndSession();
+            else
+            {
+                _pendingPedAnimations.Clear();
+                ClearPhysicalHandCards();
+                ClearOpponentSecondaryAnimation();
+            }
+        }
+
+        private void SyncHandCardProps(
+            List<Prop> currentProps, Ped ped, IList<TrucoCard> cards, bool faceDown)
+        {
+            int desiredCount = cards == null ? 0 : Math.Min(3, cards.Count);
+            while (currentProps.Count > desiredCount)
+            {
+                int last = currentProps.Count - 1;
+                DeleteHandCardProp(currentProps[last]);
+                currentProps.RemoveAt(last);
+            }
+
+            if (desiredCount == 0)
+                return;
+
+            if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
+            {
+                DeleteHandCardProps(currentProps);
+                return;
+            }
+
+            int boneIndex = Function.Call<int>(
+                GetEntityBoneIndexByNameNative,
+                new InputArgument(ped.Handle),
+                new InputArgument("SKEL_L_Finger13"));
+            if (boneIndex < 0)
+            {
+                DeleteHandCardProps(currentProps);
+                return;
+            }
+
+            while (currentProps.Count < desiredCount)
+                currentProps.Add(null);
+
+            for (int i = 0; i < desiredCount; i++)
+            {
+                string modelName = faceDown
+                    ? HiddenCardPropModelName
+                    : GetPhysicalCardModelName(cards[i]);
+                int modelHash = new Model(modelName).Hash;
+                Prop existing = currentProps[i];
+                bool alreadyAttached = false;
+                try
+                {
+                    alreadyAttached = existing != null && existing.Exists() &&
+                                      existing.Model.Hash == modelHash &&
+                                      existing.IsAttachedTo(ped);
+                }
+                catch
+                {
+                    alreadyAttached = false;
+                }
+
+                if (alreadyAttached)
+                    continue;
+
+                DeleteHandCardProp(existing);
+                currentProps[i] = CreateAttachedCardProp(modelName, ped, boneIndex, i);
+            }
+        }
+
+        private Prop CreateAttachedCardProp(
+            string modelName, Ped ped, int boneIndex, int cardIndex)
+        {
+            Prop prop = CreateVisualProp(modelName, ped.Position, Vector3.Zero, true, false);
+            if (prop == null && !string.Equals(
+                modelName, GenericCardPropModelName, StringComparison.Ordinal))
+            {
+                prop = CreateVisualProp(
+                    GenericCardPropModelName, ped.Position, Vector3.Zero, true, false);
+            }
+
+            if (prop == null)
+                return null;
+
+            // Three cards fan across the left fingers, following the working poker prop layout.
+            float offsetX = 0.040f + cardIndex * 0.010f;
+            float offsetY = cardIndex * 0.0034f;
+            float rotationX = -95.0f + cardIndex * 10.0f;
+            float rotationY = cardIndex == 0 ? -20.0f : (cardIndex == 1 ? 0.0f : 20.0f);
+            Vector3 offset = new Vector3(offsetX, offsetY, 0.0019f);
+            Vector3 rotation = new Vector3(rotationX, rotationY, -150.0f);
+
+            try
+            {
+                prop.AttachTo(ped, boneIndex, offset, rotation);
+                if (prop.IsAttachedTo(ped))
+                    return prop;
+            }
+            catch
+            {
+                // Delete the card if the skeleton does not accept this attachment.
+            }
+
+            DeleteHandCardProp(prop);
+            return null;
+        }
+
+        private static string GetPhysicalCardModelName(TrucoCard card)
+        {
+            if (card == null)
+                return HiddenCardPropModelName;
+
+            string rank;
+            switch (card.Rank)
+            {
+                case 1: rank = "a"; break;
+                case 2: rank = "2"; break;
+                case 3: rank = "3"; break;
+                case 4: rank = "4"; break;
+                case 5: rank = "5"; break;
+                case 6: rank = "6"; break;
+                case 7: rank = "7"; break;
+                case 10: rank = "j"; break;
+                case 11: rank = "q"; break;
+                case 12: rank = "k"; break;
+                default: return GenericCardPropModelName;
+            }
+
+            string suit;
+            switch (card.Suit)
+            {
+                case SpanishSuit.Bastos: suit = "club"; break;
+                case SpanishSuit.Copas: suit = "heart"; break;
+                case SpanishSuit.Espadas: suit = "spade"; break;
+                case SpanishSuit.Oros: suit = "diamond"; break;
+                default: return GenericCardPropModelName;
+            }
+
+            return "p_crd_" + rank + "_" + suit + "01x_val";
+        }
+
+        private void EnsureDeckProp()
+        {
+            if (_tableProp == null || !_tableProp.Exists() ||
+                (_deckProp != null && _deckProp.Exists()) ||
+                DateTime.UtcNow < _nextDeckPropAttemptUtc)
+                return;
+
+            _nextDeckPropAttemptUtc = DateTime.UtcNow.AddSeconds(SetupRetrySeconds);
+            Vector3 deckPosition = _tableProp.GetOffsetPosition(
+                new Vector3(0.18f, -0.18f, 0.86f));
+            Vector3 deckRotation = new Vector3(0.0f, 0.0f, TableHeading - 15.0f);
+
+            _deckProp = CreateVisualProp(
+                DeckPropModelName, deckPosition, deckRotation, false, true);
+            if (_deckProp == null)
+            {
+                _deckProp = CreateVisualProp(
+                    DeckFallbackModelName, deckPosition, deckRotation, false, true);
+            }
+        }
+
+        private static Prop CreateVisualProp(
+            string modelName, Vector3 position, Vector3 rotation,
+            bool dynamic, bool freeze)
+        {
+            try
+            {
+                Model model = new Model(modelName);
+                if (!model.IsValid || !model.IsInCdImage || !model.Request(1200))
+                    return null;
+
+                Prop prop = World.CreatePropNoOffset(model, position, rotation, dynamic);
+                if (prop == null || !prop.Exists())
+                    return null;
+
+                prop.IsMissionEntity = true;
+                prop.HasCollision = false;
+                ENTITY.FREEZE_ENTITY_POSITION(prop.Handle, freeze);
+                return prop;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void DeleteHandCardProps(List<Prop> props)
+        {
+            for (int i = props.Count - 1; i >= 0; i--)
+                DeleteHandCardProp(props[i]);
+            props.Clear();
+        }
+
+        private static void DeleteHandCardProp(Prop prop)
+        {
+            try
+            {
+                if (prop != null && prop.Exists())
+                {
+                    if (prop.IsAttached)
+                        prop.Detach();
+                    prop.Delete();
+                }
+            }
+            catch
+            {
+                // Keep cleanup safe when a card prop was already removed by the game.
+            }
         }
 
         private void QueuePedAnimation(Ped ped, string dictionary, string clip,
@@ -896,6 +1146,8 @@ namespace TrucoRDR2
             _sessionActive = false;
             _playerScenarioStartedUtc = DateTime.MinValue;
             _pendingPedAnimations.Clear();
+            ClearPhysicalHandCards();
+            ClearOpponentSecondaryAnimation();
 
             try
             {
@@ -917,6 +1169,23 @@ namespace TrucoRDR2
 
             _hasOriginalPlayerTransform = false;
             SetPromptEnabled(false);
+        }
+
+        private void ClearOpponentSecondaryAnimation()
+        {
+            try
+            {
+                if (_opponent != null && _opponent.Exists() && !_opponent.IsDeadOrDying)
+                {
+                    Function.Call(
+                        ClearPedSecondaryTaskNative,
+                        new InputArgument(_opponent.Handle));
+                }
+            }
+            catch
+            {
+                // The native clears only the NPC's secondary animation task, not its seat scenario.
+            }
         }
 
         private static Prop CreateFurnitureProp(string modelName, Vector3 position, float heading)
