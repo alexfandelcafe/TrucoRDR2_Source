@@ -730,62 +730,81 @@ namespace TrucoRDR2
 
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
 
+            // Envido is evaluated separately: truco strength and envido points are
+            // different resources and should not use the same threshold.
             int envido = round.EnvidoFor(TrucoPlayer.Opponent);
             if (round.CanCallEnvido(TrucoPlayer.Opponent))
             {
-                TrucoCall? envidoCall = null;
-                if (envido >= 32 && Math.Max(_match.PlayerScore, _match.OpponentScore) >= _match.TargetPoints - 5)
-                    envidoCall = TrucoCall.FaltaEnvido;
-                else if (envido >= 32)
-                    envidoCall = TrucoCall.RealEnvido;
-                else if (envido >= 29)
-                    envidoCall = TrucoCall.Envido;
-
-                if (envidoCall.HasValue && round.CallEnvido(TrucoPlayer.Opponent, envidoCall.Value))
+                TrucoCall? call = ChooseOpeningEnvidoCall(envido);
+                if (call.HasValue && round.CallEnvido(TrucoPlayer.Opponent, call.Value))
                 {
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                     return;
                 }
             }
 
-            int strength = round.HandStrength(TrucoPlayer.Opponent);
-            if (round.CanCallTruco(TrucoPlayer.Opponent) && strength >= 28)
+            int equity = EstimateTrucoEquity(round);
+            int callThreshold = 68 + GetScoreRiskModifier();
+            if (round.TrucoLevel == 1)
+                callThreshold += 8;
+            else if (round.TrucoLevel >= 2)
+                callThreshold += 15;
+
+            if (round.CanCallTruco(TrucoPlayer.Opponent) && equity >= callThreshold)
             {
                 round.CallTruco(TrucoPlayer.Opponent);
                 TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                 return;
             }
 
-            // With a very weak hand facing an accepted raise, the computer may concede
-            // instead of playing out a hand that is unlikely to recover.
-            if (round.TrucoStake >= 2 && strength <= 12 && _random.NextDouble() < 0.30)
-            {
-                if (round.Fold(TrucoPlayer.Opponent))
-                {
-                    RefreshSprites();
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Win);
-                }
-                return;
-            }
-
             PlayComputerCard();
+        }
+
+        private TrucoCall? ChooseOpeningEnvidoCall(int points)
+        {
+            int target = _match.TargetPoints;
+            int highestScore = Math.Max(_match.PlayerScore, _match.OpponentScore);
+            bool nearFinish = highestScore >= target - 5;
+            int risk = GetScoreRiskModifier();
+
+            // A Falta Envido is high variance. Prefer it near the finish with a
+            // very strong hand, unless the score says the computer should protect a lead.
+            if (points >= 32 && nearFinish && (risk <= 0 || points == 33))
+                return TrucoCall.FaltaEnvido;
+
+            if (points >= 31)
+                return TrucoCall.RealEnvido;
+
+            if (points >= 28)
+                return TrucoCall.Envido;
+
+            // When substantially behind, the computer occasionally contests a
+            // marginal envido instead of playing passively every hand.
+            if (points >= 26 && risk <= -5 && _random.NextDouble() < 0.28)
+                return TrucoCall.Envido;
+
+            return null;
         }
 
         private void ComputerRespond()
         {
             TrucoRound round = _match.Round;
             TrucoCall pending = round.PendingCall;
-            bool accepted;
+            bool accepted = false;
+            int risk = GetScoreRiskModifier();
 
             if (pending == TrucoCall.Envido || pending == TrucoCall.RealEnvido ||
                 pending == TrucoCall.FaltaEnvido)
             {
                 int points = round.EnvidoFor(TrucoPlayer.Opponent);
+                bool nearFinish = Math.Max(_match.PlayerScore, _match.OpponentScore) >=
+                                  _match.TargetPoints - 5;
 
-                if (pending == TrucoCall.Envido && points >= 26 && _random.NextDouble() < 0.20 &&
-                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.Envido))
+                if (pending != TrucoCall.FaltaEnvido && points >= 32 && nearFinish &&
+                    (risk <= 2 || points == 33) &&
+                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido))
                 {
-                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.Envido);
+                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido);
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                     return;
                 }
@@ -798,35 +817,34 @@ namespace TrucoRDR2
                     return;
                 }
 
-                if ((pending == TrucoCall.Envido || pending == TrucoCall.RealEnvido) && points >= 32 &&
-                    Math.Max(_match.PlayerScore, _match.OpponentScore) >= _match.TargetPoints - 5 &&
-                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido))
+                if (pending == TrucoCall.Envido && points >= 29 && risk <= -5 &&
+                    _random.NextDouble() < 0.35 &&
+                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.Envido))
                 {
-                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido);
+                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.Envido);
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                     return;
                 }
 
-                if (pending == TrucoCall.RealEnvido && points >= 33 &&
-                    round.CanRaiseEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido))
-                {
-                    round.CallEnvido(TrucoPlayer.Opponent, TrucoCall.FaltaEnvido);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
-                }
-
-                int threshold = round.PendingValue <= 2 ? 22 :
-                                round.PendingValue <= 5 ? 27 : 31;
-                if (_match.OpponentScore > _match.PlayerScore)
-                    threshold -= 2;
-                accepted = points >= threshold;
+                // Accept based on estimated chance to win rather than a single,
+                // fixed point cutoff. Larger stakes require more confidence.
+                double winChance = EstimateEnvidoWinChance(points);
+                double requiredChance = round.PendingValue <= 2 ? 0.24 :
+                                        round.PendingValue <= 3 ? 0.32 :
+                                        round.PendingValue <= 5 ? 0.40 : 0.49;
+                requiredChance += risk * 0.004;
+                requiredChance = Clamp(requiredChance, 0.12, 0.82);
+                accepted = winChance >= requiredChance;
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
             else if (pending == TrucoCall.Flor || pending == TrucoCall.ContraFlor ||
                      pending == TrucoCall.ContraFlorAlResto)
             {
                 int flor = round.FlorFor(TrucoPlayer.Opponent);
-                if (pending == TrucoCall.Flor && flor >= 30 &&
+                bool nearFinish = Math.Max(_match.PlayerScore, _match.OpponentScore) >=
+                                  _match.TargetPoints - 5;
+
+                if (pending == TrucoCall.Flor && flor >= 33 && risk <= 8 &&
                     round.CanRaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlor))
                 {
                     round.RaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlor);
@@ -834,7 +852,8 @@ namespace TrucoRDR2
                     return;
                 }
 
-                if (pending == TrucoCall.ContraFlor && flor >= 32 &&
+                if (pending == TrucoCall.ContraFlor && flor >= 35 && nearFinish &&
+                    (risk <= 0 || flor >= 38) &&
                     round.CanRaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlorAlResto))
                 {
                     round.RaiseFlor(TrucoPlayer.Opponent, TrucoCall.ContraFlorAlResto);
@@ -842,34 +861,46 @@ namespace TrucoRDR2
                     return;
                 }
 
-                accepted = flor >= 28;
+                double winChance = EstimateFlorWinChance(flor);
+                double requiredChance = pending == TrucoCall.Flor ? 0.16 :
+                                        pending == TrucoCall.ContraFlor ? 0.27 : 0.41;
+                requiredChance += risk * 0.004;
+                requiredChance = Clamp(requiredChance, 0.08, 0.80);
+                accepted = winChance >= requiredChance;
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
             else
             {
+                // Envido may still be sung in response to a Truco before the first
+                // card. The round engine suspends and restores the truco offer.
                 int envido = round.EnvidoFor(TrucoPlayer.Opponent);
-                if (round.CardsPlayed == 0 && round.CanCallEnvido(TrucoPlayer.Opponent) && envido >= 29)
+                if (round.CardsPlayed == 0 && round.CanCallEnvido(TrucoPlayer.Opponent) &&
+                    envido >= 29 && (risk <= 5 || envido >= 32))
                 {
                     TrucoCall answer = envido >= 32 ? TrucoCall.RealEnvido : TrucoCall.Envido;
-                    round.CallEnvido(TrucoPlayer.Opponent, answer);
-                    TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
-                    return;
+                    if (round.CallEnvido(TrucoPlayer.Opponent, answer))
+                    {
+                        TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
+                        return;
+                    }
                 }
 
-                int strength = round.HandStrength(TrucoPlayer.Opponent);
-                int threshold = pending == TrucoCall.Truco ? 21 :
-                                pending == TrucoCall.Retruco ? 29 : 36;
-                if (_match.OpponentScore >= _match.TargetPoints - 3)
-                    threshold += 2;
+                int equity = EstimateTrucoEquity(round);
+                int threshold = pending == TrucoCall.Truco ? 42 :
+                                pending == TrucoCall.Retruco ? 56 : 68;
+                threshold += risk;
 
+                int raiseThreshold = pending == TrucoCall.Truco ? 86 : 92;
+                raiseThreshold += Math.Max(0, risk);
                 if ((pending == TrucoCall.Truco || pending == TrucoCall.Retruco) &&
-                    strength >= 34 && round.RaiseTruco(TrucoPlayer.Opponent))
+                    equity >= raiseThreshold &&
+                    round.RaiseTruco(TrucoPlayer.Opponent))
                 {
                     TrucoAudio.Play(_soundEnabled, TrucoSound.Accept);
                     return;
                 }
 
-                accepted = strength >= threshold;
+                accepted = equity >= threshold;
                 round.RespondPending(TrucoPlayer.Opponent, accepted);
             }
 
@@ -931,6 +962,8 @@ namespace TrucoRDR2
             int weakestPower = int.MaxValue;
             int strongestIndex = 0;
             int strongestPower = int.MinValue;
+            int secondStrongestIndex = -1;
+            int secondStrongestPower = int.MinValue;
             int winningIndex = -1;
             int winningPower = int.MaxValue;
             int tyingIndex = -1;
@@ -951,12 +984,20 @@ namespace TrucoRDR2
 
                 if (power > strongestPower)
                 {
+                    secondStrongestPower = strongestPower;
+                    secondStrongestIndex = strongestIndex;
                     strongestPower = power;
                     strongestIndex = i;
+                }
+                else if (power > secondStrongestPower)
+                {
+                    secondStrongestPower = power;
+                    secondStrongestIndex = i;
                 }
 
                 if (round.PendingCard != null)
                 {
+                    // Spend the cheapest card that can win the current trick.
                     if (power > pendingPower && power < winningPower)
                     {
                         winningPower = power;
@@ -972,40 +1013,73 @@ namespace TrucoRDR2
 
             if (round.PendingCard != null)
             {
-                // A parda can secure the hand if the computer won the first trick,
-                // or if all three tricks are tied and the computer is mano.
-                bool tieWinsHand = WouldPardaWinHandForComputer(round);
-                if (tieWinsHand && tyingIndex >= 0)
+                // A tie is useful only when the current hand state favours the
+                // computer on a parda. Otherwise prefer a low-cost winning card.
+                if (IsPardaFavorableToComputer(round) && tyingIndex >= 0)
                     return tyingIndex;
 
-                // Spend the weakest card that beats the opposing card; otherwise shed the weakest.
-                return winningIndex >= 0 ? winningIndex : weakestIndex;
+                if (winningIndex >= 0)
+                    return winningIndex;
+
+                // Nothing can beat the exposed card: keep the strongest cards.
+                return weakestIndex;
             }
 
-            // If a third trick is required, play to win it unless a parda already
-            // awards the hand to the computer as mano.
             if (MustWinNextTrick(round))
                 return strongestIndex;
 
-            // When leading a trick with the hand already favoured, preserve strong cards.
+            if (round.Tricks.Count == 0 && cards.Count >= 3)
+            {
+                // Open with a middle-strength card when the hand has a reliable
+                // top card, preserving it as a possible response later.
+                if (strongestPower >= 12 && secondStrongestPower >= 8)
+                    return secondStrongestIndex;
+                if (strongestPower >= 9 && secondStrongestPower >= 7)
+                    return secondStrongestIndex;
+                return weakestIndex;
+            }
+
+            // If the computer won the first trick, a cheap lead keeps its edge
+            // while preserving cards for a possible third trick.
+            if (round.Tricks.Count == 1 && round.Tricks[0].Winner == TrucoPlayer.Opponent)
+                return weakestIndex;
+
+            // If all of the first two tricks were pardas and the computer is mano,
+            // a tie is already favourable; lead cheaply and make the player respond.
+            if (round.Tricks.Count == 1 && round.Tricks[0].IsParda &&
+                round.Mano == TrucoPlayer.Opponent)
+                return weakestIndex;
+
             return weakestIndex;
         }
 
-        private static bool WouldPardaWinHandForComputer(TrucoRound round)
+        private static bool IsPardaFavorableToComputer(TrucoRound round)
         {
+            if (round.Tricks.Count == 0)
+                return round.Mano == TrucoPlayer.Opponent;
+
             if (round.Tricks.Count == 1)
-                return round.Tricks[0].Winner == TrucoPlayer.Opponent;
+            {
+                TrucoTrick first = round.Tricks[0];
+                if (first.Winner == TrucoPlayer.Opponent)
+                    return true;
+                if (first.Winner == TrucoPlayer.Player)
+                    return false;
+                return round.Mano == TrucoPlayer.Opponent;
+            }
 
             if (round.Tricks.Count == 2)
             {
                 TrucoTrick first = round.Tricks[0];
                 TrucoTrick second = round.Tricks[1];
-
-                if (first.Winner == TrucoPlayer.Opponent)
+                if (first.Winner == TrucoPlayer.Opponent &&
+                    second.Winner == TrucoPlayer.Player)
                     return true;
-
-                if (first.IsParda && second.IsParda && round.Mano == TrucoPlayer.Opponent)
-                    return true;
+                if (first.Winner == TrucoPlayer.Player &&
+                    second.Winner == TrucoPlayer.Opponent)
+                    return false;
+                if (first.IsParda && second.IsParda)
+                    return round.Mano == TrucoPlayer.Opponent;
             }
 
             return false;
@@ -1019,13 +1093,145 @@ namespace TrucoRDR2
             TrucoTrick first = round.Tricks[0];
             TrucoTrick second = round.Tricks[1];
 
-            if (first.Winner == TrucoPlayer.Player && second.Winner == TrucoPlayer.Opponent)
+            // Once each player has taken one trick, the third decides the hand.
+            if (first.Winner.HasValue && second.Winner.HasValue &&
+                first.Winner.Value != second.Winner.Value)
                 return true;
 
+            // If player mano is tied twice, the computer must break the third parda.
             if (first.IsParda && second.IsParda && round.Mano != TrucoPlayer.Opponent)
                 return true;
 
             return false;
+        }
+
+        private int EstimateTrucoEquity(TrucoRound round)
+        {
+            int equity = EstimateCardPotential(round.OpponentCards);
+
+            foreach (TrucoTrick trick in round.Tricks)
+            {
+                if (trick.Winner == TrucoPlayer.Opponent)
+                    equity += 11;
+                else if (trick.Winner == TrucoPlayer.Player)
+                    equity -= 11;
+                else
+                    equity += round.Mano == TrucoPlayer.Opponent ? 3 : -3;
+            }
+
+            // Only use information visible to the opponent: a card already played
+            // face-up by the player. Never inspect the player's unplayed cards.
+            if (round.PendingCard != null && round.PendingPlayer == TrucoPlayer.Player)
+            {
+                int pendingPower = TrucoRules.TrucoPower(round.PendingCard);
+                int bestPower = 0;
+                bool canTie = false;
+                foreach (TrucoCard card in round.OpponentCards)
+                {
+                    int power = TrucoRules.TrucoPower(card);
+                    if (power > bestPower)
+                        bestPower = power;
+                    if (power == pendingPower)
+                        canTie = true;
+                }
+
+                if (bestPower > pendingPower)
+                    equity += 10;
+                else if (canTie)
+                    equity += IsPardaFavorableToComputer(round) ? 3 : -5;
+                else
+                    equity -= 12;
+            }
+
+            return Clamp(equity, 5, 98);
+        }
+
+        private static int EstimateCardPotential(IList<TrucoCard> cards)
+        {
+            if (cards == null || cards.Count == 0)
+                return 0;
+
+            List<int> powers = new List<int>(cards.Count);
+            foreach (TrucoCard card in cards)
+            {
+                if (card != null)
+                    powers.Add(TrucoRules.TrucoPower(card));
+            }
+            if (powers.Count == 0)
+                return 0;
+
+            powers.Sort(delegate(int left, int right) { return right.CompareTo(left); });
+
+            // Normalizing against the maximum for the remaining card count keeps
+            // bidding thresholds meaningful after the first and second tricks.
+            double weighted = powers[0];
+            double maximum = 14.0;
+            if (powers.Count > 1)
+            {
+                weighted += powers[1] * 0.70;
+                maximum += 13.0 * 0.70;
+            }
+            if (powers.Count > 2)
+            {
+                weighted += powers[2] * 0.40;
+                maximum += 12.0 * 0.40;
+            }
+
+            return (int)Math.Round(weighted / maximum * 100.0);
+        }
+
+        private int GetScoreRiskModifier()
+        {
+            if (_match == null)
+                return 0;
+
+            int modifier = 0;
+            int computerToWin = _match.TargetPoints - _match.OpponentScore;
+            int playerToWin = _match.TargetPoints - _match.PlayerScore;
+
+            // Positive values mean protect a lead; negative values mean take more risk.
+            if (computerToWin <= 3)
+                modifier += 10;
+            else if (computerToWin <= 6)
+                modifier += 4;
+
+            if (playerToWin <= 3)
+                modifier -= 10;
+            else if (playerToWin <= 6)
+                modifier -= 4;
+
+            int scoreDifference = _match.OpponentScore - _match.PlayerScore;
+            if (scoreDifference >= 6)
+                modifier += 4;
+            else if (scoreDifference <= -6)
+                modifier -= 4;
+
+            return Clamp(modifier, -15, 15);
+        }
+
+        private static double EstimateEnvidoWinChance(int points)
+        {
+            if (points <= 20) return 0.08;
+            if (points <= 24) return 0.08 + (points - 20) * 0.035;
+            if (points <= 27) return 0.22 + (points - 24) * 0.06;
+            if (points <= 30) return 0.40 + (points - 27) * 0.08;
+            return Clamp(0.64 + (points - 30) * 0.09, 0.0, 0.91);
+        }
+
+        private static double EstimateFlorWinChance(int points)
+        {
+            if (points <= 0) return 0.0;
+            return Clamp(0.10 + (points - 20) * 0.045, 0.05, 0.91);
+        }
+
+        private static int Clamp(int value, int minimum, int maximum)
+        {
+            return Math.Max(minimum, Math.Min(maximum, value));
+        }
+
+        private static double Clamp(double value, double minimum, double maximum)
+        {
+            return Math.Max(minimum, Math.Min(maximum, value));
         }
 
         private bool DrawDealingCard(int index)
