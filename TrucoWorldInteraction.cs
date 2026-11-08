@@ -43,7 +43,7 @@ namespace TrucoRDR2
         private const double SeatPreparationSeconds = 2.0;
         private const double PromptIntervalSeconds = 2.5;
 
-        private readonly uint _playerSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
+        private readonly uint _playerSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR_MP_PLAYER");
         private readonly uint _opponentSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
 
         private Vector3 _playerSeatPosition;
@@ -240,10 +240,13 @@ namespace TrucoRDR2
             player.Heading = PlayerHeading;
             _opponent.Heading = OpponentHeading;
 
+            // TaskInvoker.StartScenario parameters are (teleportToScenario, isSittingScenario).
+            // The player-specific scenario is important for the player ped; do not teleport
+            // either character when the scenario starts because they have already walked there.
             player.Task.StartScenario(
-                _playerSeatScenario, _playerSeatPosition, -1, true, true);
+                _playerSeatScenario, _playerSeatPosition, -1, false, true);
             _opponent.Task.StartScenario(
-                _opponentSeatScenario, _opponentSeatPosition, -1, true, true);
+                _opponentSeatScenario, _opponentSeatPosition, -1, false, true);
         }
 
         private bool AreBothCharactersNearApproach()
