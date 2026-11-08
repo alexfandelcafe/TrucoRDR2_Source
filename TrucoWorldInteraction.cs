@@ -50,6 +50,8 @@ namespace TrucoRDR2
         private const ulong PromptSetGroup = 0x2F11D3A254169EA4;
         private const ulong PromptGetGroupIdForTargetEntity = 0xB796970BD125FCE8;
         private const uint InteractControlHash = 0xD51B784F;
+        // This is the same control hash Companion passes to NemesisMod.MakePrompt.
+        private const int CompanionPromptControlHash = 1980406895;
         private const ulong PromptIsValid = 0x347469FBDD1589A9;
         private const ulong PromptIsActive = 0x546E342E01DE71CF;
         private const ulong PromptIsJustPressed = 0x2787CC611D3FACC5;
@@ -80,6 +82,8 @@ namespace TrucoRDR2
 
         private int _interactionPrompt;
         private int _interactionPromptGroup;
+        private bool _interactionPromptUsesCompanionFactory;
+        private bool _interactionPromptArmed;
         private bool _opponentSpawnAttempted;
         private bool _opponentScenarioStarted;
         private bool _worldSetupComplete;
@@ -142,10 +146,39 @@ namespace TrucoRDR2
                 return false;
             }
 
-            // Keep the native prompt enabled, and draw an explicit fallback label over the
-            // NPC: some RDR2 builds accept its E input but don't render custom focus prompts.
             SetPromptEnabled(true);
-            DrawWorldInteractionPrompt();
+
+            // The Companion factory creates its normal hold-mode prompt. Match its own
+            // completion/arming behavior rather than treating the hold prompt as a key press.
+            if (_interactionPromptUsesCompanionFactory)
+            {
+                bool holdCompleted = false;
+                try { holdCompleted = HUD._UI_PROMPT_HAS_HOLD_MODE_COMPLETED(_interactionPrompt); }
+                catch { }
+
+                if (!holdCompleted)
+                {
+                    _interactionPromptArmed = true;
+                    if (!IsPromptActive())
+                        DrawWorldInteractionPrompt();
+                    return false;
+                }
+
+                if (!_interactionPromptArmed)
+                {
+                    if (!IsPromptActive())
+                        DrawWorldInteractionPrompt();
+                    return false;
+                }
+
+                _interactionPromptArmed = false;
+                return TryBegin(player);
+            }
+
+            // Native text may not render on every SHVDN V2 install; keep the visible label
+            // as a fallback only when the native prompt itself is not active.
+            if (!IsPromptActive())
+                DrawWorldInteractionPrompt();
 
             if (IsPromptActive() && IsPromptJustPressed())
                 return TryBegin(player);
@@ -519,29 +552,62 @@ namespace TrucoRDR2
 
         private void CreateInteractionPrompt()
         {
+            Type hooksType = FindCompanionHooksType();
+            if (hooksType != null)
+            {
+                // Reuse the exact factory used for "Cabalga conmigo". If Companion is
+                // present but still initializing, retry world setup instead of silently
+                // creating a second, incompatible prompt implementation.
+                const BindingFlags staticPrivate = BindingFlags.Static | BindingFlags.NonPublic;
+                FieldInfo installedField = hooksType.GetField("_installed", staticPrivate);
+                FieldInfo factoryField = hooksType.GetField("_makePrompt", staticPrivate);
+                bool installed = installedField != null && installedField.GetValue(null) is bool ready && ready;
+                MethodInfo factory = factoryField == null ? null : factoryField.GetValue(null) as MethodInfo;
+                if (!installed || factory == null || !factory.IsStatic)
+                    throw new InvalidOperationException(
+                        "Esperando a que Companion termine de inicializar MakePrompt para crear Jugar al truco.");
+
+                int group = HUD._UI_PROMPT_GET_GROUP_ID_FOR_TARGET_ENTITY(_opponent.Handle);
+                if (group == 0)
+                    throw new InvalidOperationException(
+                        "RDR2 no devolvió un grupo de foco válido para el NPC del truco.");
+
+                object control = PromptControlArgument(
+                    factory.GetParameters()[0].ParameterType, CompanionPromptControlHash);
+                object result = factory.Invoke(null, new object[] {
+                    control, "Jugar al truco", true, group
+                });
+                int promptId = Convert.ToInt32(result);
+                if (promptId == 0 || !Function.Call<bool>(PromptIsValid, promptId))
+                    throw new InvalidOperationException(
+                        "El helper MakePrompt de Companion no pudo registrar Jugar al truco.");
+
+                _interactionPrompt = promptId;
+                _interactionPromptGroup = group;
+                _interactionPromptUsesCompanionFactory = true;
+                _interactionPromptArmed = false;
+                SetPromptEnabled(false);
+                return;
+            }
+
+            // Companion is optional. Without its assembly, retain the standalone native
+            // prompt path so the truco mod still works in installations without Companion.
             int prompt = Function.Call<int>(PromptRegisterBegin);
             if (prompt == 0)
                 throw new InvalidOperationException("No se pudo registrar el prompt contextual del rival.");
 
             try
             {
-                // INPUT_CONTEXT_Y is E on the default PC keyboard layout.
                 Function.Call(PromptSetControlAction, prompt, InteractControlHash);
-                // Keep the E action in the normal input order so the game renders its
-                // keyboard/controller glyph consistently with other focus prompts.
                 Function.Call(PromptSetOrderingAsInputType, prompt, InteractControlHash);
                 Function.Call(PromptSetText, prompt,
                     MISC.VAR_STRING(10, "LITERAL_STRING", "Jugar al truco"));
                 Function.Call(PromptSetPriority, prompt, 2);
-                // Standard mode must be enabled for the prompt to render as an ordinary
-                // press action; false left the input detectable but the UI prompt hidden.
                 Function.Call(PromptSetStandardMode, prompt, true);
                 Function.Call(PromptSetAttribute, prompt, 18, true);
                 Function.Call(PromptRegisterEnd, prompt);
 
                 _interactionPrompt = prompt;
-                // Attach the action to the NPC's own focus group. This is the group RDR2
-                // activates when the player targets/focuses this ped.
                 _interactionPromptGroup = Function.Call<int>(
                     PromptGetGroupIdForTargetEntity, _opponent.Handle);
                 if (_interactionPromptGroup == 0)
@@ -553,22 +619,39 @@ namespace TrucoRDR2
                     throw new InvalidOperationException(
                         "RDR2 rechazó el prompt Jugar al truco después de registrarlo.");
 
+                _interactionPromptUsesCompanionFactory = false;
+                _interactionPromptArmed = false;
                 SetPromptEnabled(false);
             }
             catch
             {
-                try
-                {
-                    Function.Call(PromptDelete, prompt);
-                }
-                catch
-                {
-                    // Preserve the original prompt-registration exception.
-                }
+                try { Function.Call(PromptDelete, prompt); } catch { }
                 _interactionPrompt = 0;
                 _interactionPromptGroup = 0;
+                _interactionPromptUsesCompanionFactory = false;
+                _interactionPromptArmed = false;
                 throw;
             }
+        }
+
+        private static Type FindCompanionHooksType()
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                Type type = assemblies[i].GetType(
+                    "EnRAGECompanionsExtension.EnRAGEHooks", false);
+                if (type != null)
+                    return type;
+            }
+            return null;
+        }
+
+        private static object PromptControlArgument(Type targetType, int control)
+        {
+            if (targetType.IsEnum)
+                return Enum.ToObject(targetType, control);
+            return Convert.ChangeType(control, targetType);
         }
 
         private bool TryBegin(Ped player)
@@ -752,8 +835,18 @@ namespace TrucoRDR2
                     !Function.Call<bool>(PromptIsValid, _interactionPrompt))
                     return;
 
-                Function.Call(PromptSetVisible, _interactionPrompt, enabled);
-                Function.Call(PromptSetEnabled, _interactionPrompt, enabled);
+                if (!enabled)
+                    _interactionPromptArmed = false;
+                if (_interactionPromptUsesCompanionFactory)
+                {
+                    HUD._UI_PROMPT_SET_VISIBLE(_interactionPrompt, enabled);
+                    HUD._UI_PROMPT_SET_ENABLED(_interactionPrompt, enabled);
+                }
+                else
+                {
+                    Function.Call(PromptSetVisible, _interactionPrompt, enabled);
+                    Function.Call(PromptSetEnabled, _interactionPrompt, enabled);
+                }
             }
             catch
             {
@@ -779,6 +872,8 @@ namespace TrucoRDR2
             {
                 _interactionPrompt = 0;
                 _interactionPromptGroup = 0;
+                _interactionPromptUsesCompanionFactory = false;
+                _interactionPromptArmed = false;
             }
         }
 
