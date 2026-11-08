@@ -129,7 +129,14 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 
 ### Rival controlado por IA
 
-El rival ya no juega cartas al azar. Evalúa su envido, la fuerza de su mano, la carta que tiene enfrente y el tamaño de la apuesta. Puede cantar o subir apuestas y aceptar/rechazar según su mano y el tanteador. Esta primera IA es deliberadamente básica: no simula todos los estilos humanos y deberá ajustarse con pruebas reales.
+La IA usa heurísticas situacionales, sin consultar las cartas que el jugador todavía no jugó.
+
+- **Selección de cartas:** intenta ganar una baza gastando la carta más barata que supera la rival; conserva cartas fuertes cuando no puede ganar, y adapta la salida al resultado de las bazas anteriores y a quién favorece una parda.
+- **Apuestas de truco:** estima la fuerza relativa de las cartas restantes y ajusta la decisión de cantar, subir, aceptar o rechazar según el nivel de la apuesta y el tanteador. La evaluación se recalcula a medida que avanza la mano, por lo que también funciona con una o dos cartas restantes.
+- **Envido y flor:** estima la probabilidad de ganar a partir de los puntos propios y exige más confianza ante apuestas grandes. Puede subir apuestas cuando la mano lo justifica.
+- **Riesgo según tanteador:** tiende a proteger una ventaja cerca del final y a asumir más riesgo si está perdiendo.
+
+La estrategia sigue siendo heurística, no una simulación exhaustiva ni un modelo perfecto del juego humano. Hay que validar sus decisiones y el tanteador con partidas reales.
 
 ### Interfaz y presentación
 
