@@ -41,6 +41,7 @@ namespace TrucoRDR2
         private const ulong PromptSetPriority = 0xCA24F528D0D16289;
         private const ulong PromptSetStandardMode = 0xCC6656799977741B;
         private const ulong PromptSetType = 0xF4A5C4509BF923B1;
+        private const ulong PromptSetAttribute = 0x560E76D5E2E1803F;
         private const ulong PromptSetVisible = 0x71215ACCFDE075EE;
         private const ulong PromptSetEnabled = 0x8A0FB4D03A630D21;
         private const ulong PromptSetGroup = 0x2F11D3A254169EA4;
@@ -508,7 +509,10 @@ namespace TrucoRDR2
                 Function.Call(PromptSetText, prompt,
                     MISC.VAR_STRING(10, "LITERAL_STRING", "Jugar al truco"));
                 Function.Call(PromptSetPriority, prompt, 2);
-                Function.Call(PromptSetStandardMode, prompt, false);
+                // Standard mode must be enabled for the prompt to render as an ordinary
+                // press action; false left the input detectable but the UI prompt hidden.
+                Function.Call(PromptSetStandardMode, prompt, true);
+                Function.Call(PromptSetAttribute, prompt, 18, true);
                 Function.Call(PromptRegisterEnd, prompt);
 
                 _interactionPrompt = prompt;
