@@ -29,8 +29,8 @@ namespace TrucoRDR2
         private const float PlayerHeading = 270.0f;
         private const float OpponentHeading = 90.0f;
 
-        private const float InteractionRadius = 3.2f;
-        private const float PromptRadius = 2.8f;
+        private const float InteractionRadius = 4.5f;
+        private const float PromptRadius = 4.0f;
         private const double SetupRetrySeconds = 3.0;
         private const double ScenarioWarmupSeconds = 1.5;
 
@@ -124,17 +124,23 @@ namespace TrucoRDR2
             }
 
             Ped player = Game.Player.Character;
-            if (!CanPlayerInteract(player) || !IsOpponentAvailable())
+            if (!CanPlayerUsePrompt(player) || !IsOpponentAvailable())
             {
                 SetPromptEnabled(false);
                 return false;
             }
 
+            // Let RDR2's context-prompt radius decide when the action is active.
+            // Only activate the exclusive group while the prompt is actually in range.
             UpdatePromptAnchor();
             SetPromptEnabled(true);
+
+            if (!IsPromptActive())
+                return false;
+
             ActivateExclusivePromptGroup();
 
-            if (IsPromptActive() && IsPromptJustPressed())
+            if (IsPromptJustPressed())
                 return TryBegin(player);
 
             return false;
@@ -362,6 +368,12 @@ namespace TrucoRDR2
                 EndSession();
                 return false;
             }
+        }
+
+        private bool CanPlayerUsePrompt(Ped player)
+        {
+            return player != null && player.Exists() && !player.IsDeadOrDying &&
+                   !player.IsOnMount && !player.IsInCombat;
         }
 
         private bool CanPlayerInteract(Ped player)
