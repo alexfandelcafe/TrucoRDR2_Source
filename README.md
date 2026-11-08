@@ -133,14 +133,14 @@ La escena del salón de Valentine se prepara al inicializar el script, no al pul
 
 - El mod crea la mesa (p_table01x), las dos sillas (p_chair02x) y el rival al iniciar el script. Los objetos se apoyan sobre el suelo del interior y permanecen en su sitio mientras el script está cargado.
 - El rival aparece sentado desde el inicio con el escenario PROP_HUMAN_SEAT_CHAIR.
-- Al acercarse al rival aparece un prompt contextual nativo asociado a su entidad: “Jugar al truco — E”. Se utiliza el grupo de prompts del NPC y se activa ese grupo exclusivo mientras el jugador está dentro del radio de interacción.
+- Al acercarse al rival aparece un prompt contextual nativo asociado a su entidad: “Jugar al truco — E”. El prompt tiene un grupo normal propio y exclusivo; su punto contextual sigue la posición del NPC y solo se activa dentro de su radio.
 - El jugador no camina hasta la silla. Al aceptar el prompt, se guarda su posición original y se inicia directamente PROP_HUMAN_SEAT_CHAIR en la posición de su silla.
 - El prompt no se ofrece si el jugador está muerto, montado o en combate. También se oculta si el rival muere, huye, está asustado o intimidado, ebrio, entra en combate, recibe daño, se cae, queda aturdido, está en ragdoll, arde, está siendo arrestado, lassoed/hogtied, se levanta o deja de ejecutar/sale del escenario.
 - Si el rival entra en uno de esos estados durante una partida, la mesa se cierra y se restaura la posición original del jugador cuando es seguro hacerlo. No se crea un rival sustituto automáticamente.
 - Al cerrar con Esc, la partida termina pero los muebles y el rival permanecen en el mundo. Al descargar/abortar el script se eliminan el prompt, los objetos y el rival.
 - Ctrl+F9 sigue disponible como atajo de desarrollo para abrir la interfaz sin usar el prompt del NPC.
 
-El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). El punto de sentado se calcula como un desplazamiento local de la silla (GetOffsetPosition): y = -0,05, z = 0,50. La escena y el prompt requieren validación visual en el juego; la activación del grupo exclusivo controla los prompts normales, pero los grupos ambientales independientes del propio RDR2 pueden seguir siendo administrados por el motor.
+El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). El punto de sentado se calcula como un desplazamiento local de la silla (GetOffsetPosition): y = -0,05, z = 0,50. La escena y el prompt requieren validación visual en el juego; el grupo normal propio desplaza a los demás grupos normales mientras está activo, pero los grupos ambientales independientes del propio RDR2 pueden seguir siendo administrados por el motor.
 
 ### Rival controlado por IA
 
