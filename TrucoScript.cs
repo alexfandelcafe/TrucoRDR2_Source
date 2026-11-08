@@ -364,9 +364,9 @@ namespace TrucoRDR2
             if (element == null || !element.Enabled || string.IsNullOrEmpty(element.Caption))
                 return;
 
-            // TextElement.Draw() uses UIDEBUG's debug-text path, which can flicker.
-            // Invoke the supported RDR2 HUD natives by hash because this ScriptHookRDR2DotNet
-            // build does not expose all of them as HUD methods.
+            // On current RDR2 builds HUD._DISPLAY_TEXT and HUD._SET_TEXT_COLOR are
+            // no-op natives. ScriptHookRDR2DotNet V2's TextElement uses the UIDEBUG
+            // background-text natives instead, so use that supported path directly.
             PointF position = element.Position;
             float textWidth = EstimateTextWidth(element.Caption, element.Scale);
             float x = position.X;
@@ -380,17 +380,16 @@ namespace TrucoRDR2
             if (screenWidth <= 0.0f || screenHeight <= 0.0f)
                 return;
 
-            Function.Call(0x4170B650590B3B00UL, element.Scale, element.Scale); // SET_TEXT_SCALE
-            Function.Call(0xBE5261939FBECB8CUL, false); // SET_TEXT_CENTRE
-            HUD._SET_TEXT_COLOR(element.Color.R, element.Color.G, element.Color.B, element.Color.A);
+            UIDEBUG._BG_SET_TEXT_SCALE(element.Scale, element.Scale);
+            UIDEBUG._BG_SET_TEXT_COLOR(element.Color.R, element.Color.G, element.Color.B, element.Color.A);
 
             if (element.Shadow)
-                Function.Call(0x1BE39DBAA7263CA5UL, 1, 0, 0, 0, 180); // SET_TEXT_DROPSHADOW
+                Function.Call(0x1BE39DBAA7263CA5UL, 2, 0, 0, 0, 255); // SET_TEXT_DROPSHADOW
             else
                 Function.Call(0x1BE39DBAA7263CA5UL, 0, 0, 0, 0, 0);
 
             string renderedText = MISC.VAR_STRING(10, "LITERAL_STRING", element.Caption);
-            HUD._DISPLAY_TEXT(renderedText, x / screenWidth, position.Y / screenHeight);
+            UIDEBUG._BG_DISPLAY_TEXT(renderedText, x / screenWidth, position.Y / screenHeight);
         }
 
         private static float EstimateTextWidth(string caption, float scale)
