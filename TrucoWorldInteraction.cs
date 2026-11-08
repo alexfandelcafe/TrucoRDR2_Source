@@ -124,23 +124,19 @@ namespace TrucoRDR2
             }
 
             Ped player = Game.Player.Character;
-            if (!CanPlayerUsePrompt(player) || !IsOpponentAvailable())
+            if (!CanPlayerInteract(player) || !IsOpponentAvailable())
             {
                 SetPromptEnabled(false);
                 return false;
             }
 
-            // Let RDR2's context-prompt radius decide when the action is active.
-            // Only activate the exclusive group while the prompt is actually in range.
+            // The range gate keeps the exclusive group from replacing other prompts
+            // elsewhere in the world. The context radius remains centered on the NPC.
             UpdatePromptAnchor();
             SetPromptEnabled(true);
-
-            if (!IsPromptActive())
-                return false;
-
             ActivateExclusivePromptGroup();
 
-            if (IsPromptJustPressed())
+            if (IsPromptActive() && IsPromptJustPressed())
                 return TryBegin(player);
 
             return false;
@@ -368,12 +364,6 @@ namespace TrucoRDR2
                 EndSession();
                 return false;
             }
-        }
-
-        private bool CanPlayerUsePrompt(Ped player)
-        {
-            return player != null && player.Exists() && !player.IsDeadOrDying &&
-                   !player.IsOnMount && !player.IsInCombat;
         }
 
         private bool CanPlayerInteract(Ped player)
