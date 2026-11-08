@@ -131,17 +131,17 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 
 La escena del salón de Valentine se prepara al inicializar el script, no al pulsar E.
 
-- El mod crea la mesa (`p_table06x`), las dos sillas (`p_windsorchair03x`) y el rival al iniciar el script. Las sillas conservan por ahora las posiciones cercanas existentes. Solo la mesa usa `PLACE_ENTITY_ON_GROUND_PROPERLY`; ese nativo puede colocar una silla sobre la colisión del tablero. El rival se crea directamente en el punto de sentado, no desplazado a un lado, y mesa/sillas se congelan tras colocarlas.
-- El rival aparece sentado desde el inicio con el escenario PROP_HUMAN_SEAT_CHAIR.
+- El mod crea la mesa (`p_table06x`), las dos sillas (`p_windsorchair03x`) y el rival al iniciar el script. Las sillas se colocan ahora a 1,0 m del centro de la mesa, acercándolas respecto de la posición anterior. Solo la mesa usa `PLACE_ENTITY_ON_GROUND_PROPERLY`; ese nativo puede colocar una silla sobre la colisión del tablero. El rival se crea directamente en el punto de sentado, no desplazado a un lado, y mesa/sillas se congelan tras colocarlas.
+- El rival aparece sentado desde el inicio con el escenario GENERIC_SEAT_CHAIR_TABLE_SCENARIO, evitando la actividad de fumar del escenario anterior.
 - Al acercarse a menos de 4,5 m del rival disponible aparece el prompt nativo `Jugar al truco` con el control de interacción de enRAGE y modo de mantener pulsado. Truco incorpora directamente la secuencia de `MakePrompt`: registra el prompt, fija la acción, crea el texto mediante `VAR_STRING` con memoria persistente, configura `SET_STANDARDIZED_HOLD_MODE`, asigna el grupo de foco del NPC y registra/oculta la acción hasta que corresponde activarla. No necesita `EnRAGECompanionsExtension` para crear ni usar el prompt; esa extensión solo se detecta opcionalmente para suprimir `Cabalga conmigo` y sus acciones sociales en el rival del truco.
 - Si la extensión `EnRAGECompanionsExtension` está cargada, Truco instala mediante reflexión un prefijo Harmony sobre su filtro `IsEligibleGenericCandidate`. El filtro rechaza exclusivamente el `Ped.Handle` del rival de Truco, evitando que aparezca `Cabalga conmigo` para ese NPC. El comportamiento de reclutamiento y los prompts de Companion para los demás NPC permanecen intactos. Además, bloquea las acciones sociales de enRAGE para ese mismo objetivo para que no se superpongan con `Jugar al truco`. Si la versión de la extensión cambia y la integración no puede instalarse, Truco lo registra en `scripts\\TrucoRDR2.log`.
-- El jugador no camina hasta la silla. Al aceptar el prompt, se guarda su posición original y se inicia directamente PROP_HUMAN_SEAT_CHAIR en la posición de su silla.
+- El jugador no camina hasta la silla. Al aceptar el prompt, se guarda su posición original y se inicia directamente GENERIC_SEAT_CHAIR_TABLE_SCENARIO en la posición de su silla.
 - El prompt no se ofrece si el jugador está muerto, montado o en combate. También se oculta si el rival muere, huye, está asustado o intimidado, ebrio, entra en combate, recibe daño, se cae, queda aturdido, está en ragdoll, arde, está siendo arrestado, lassoed/hogtied, se levanta o deja de ejecutar/sale del escenario.
 - Si el rival entra en uno de esos estados durante una partida, la mesa se cierra y se restaura la posición original del jugador cuando es seguro hacerlo. No se crea un rival sustituto automáticamente.
 - Al cerrar con Esc, la partida termina pero los muebles y el rival permanecen en el mundo. Al descargar/abortar el script se eliminan el prompt, los objetos y el rival.
 - Ctrl+F9 sigue disponible como atajo de desarrollo para abrir la interfaz sin usar el prompt del NPC.
 
-El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). Las sillas quedan aproximadamente a 1,34 m a cada lado de la mesa; el punto de sentado se calcula con `GetOffsetPosition` usando y = -0,05 y z = 0,50. La escena y el prompt requieren validación visual en el juego.
+El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). Las sillas quedan aproximadamente a 1,0 m a cada lado del centro de la mesa; el punto de sentado se calcula con `GetOffsetPosition` usando y = -0,05 y z = 0,50. La escena y el prompt requieren validación visual en el juego.
 
 ### Rival controlado por IA
 
