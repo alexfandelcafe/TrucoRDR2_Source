@@ -536,7 +536,7 @@ namespace TrucoRDR2
             _worldInteraction.Dispose();
             _previewEnabled = false;
             DisposeSprites();
-            WriteDiagnostic("Script abortado; mesa, rival temporal y sprites liberados.");
+            WriteDiagnostic("Script abortado; prompt, mesa, sillas, rival y sprites liberados.");
         }
 
         private void WriteExpectedYtdPath(string scriptDirectory)
