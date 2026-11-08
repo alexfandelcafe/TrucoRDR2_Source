@@ -124,8 +124,8 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 - No querer Truco, Retruco o Vale Cuatro entrega la mano por el valor anterior de la apuesta.
 - Al terminar una mano, `Enter` reparte la siguiente.
 - Al terminar la partida, `Enter` vuelve al menú; desde ahí podés iniciar otra.
-- `Esc` cierra la mesa.
-- La combinación configurada en `[Controls]` abre/cierra la mesa. El valor predeterminado es `Ctrl+F9`; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
+- `Esc` cierra la mesa y, si se inició desde el salón, termina la interacción física y libera al rival temporal.
+- En el salón de Valentine, `E` es la interacción principal. `Ctrl+F9` sigue disponible para abrir la interfaz directamente como acceso de desarrollo; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
 
 ### Interacción con el mundo (prototipo de una ubicación)
 
