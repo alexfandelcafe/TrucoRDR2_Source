@@ -88,8 +88,12 @@ namespace TrucoRDR2
 
         // Optional runtime bridge: exclude only our rival from Companion Extension recruitment.
         private static bool _companionEligibilityPatchInstalled;
+        private static bool _companionSocialPromptPatchInstalled;
         private static DateTime _nextCompanionPatchAttemptUtc;
         private static int _companionExcludedPedHandle;
+        private static MethodInfo _companionSocialTargetMethod;
+        private static MethodInfo _companionTuplePedMethod;
+        private static MethodInfo _companionHideSocialPromptMethod;
         private string _companionPromptIntegrationStatus = "Esperando la extensión Companion/EnRAGE.";
 
         public bool IsSessionActive { get { return _sessionActive; } }
@@ -259,7 +263,8 @@ namespace TrucoRDR2
                 return;
 
             _companionExcludedPedHandle = _opponent.Handle;
-            if (_companionEligibilityPatchInstalled || DateTime.UtcNow < _nextCompanionPatchAttemptUtc)
+            if ((_companionEligibilityPatchInstalled && _companionSocialPromptPatchInstalled) ||
+                DateTime.UtcNow < _nextCompanionPatchAttemptUtc)
                 return;
 
             _nextCompanionPatchAttemptUtc = DateTime.UtcNow.AddSeconds(2.0);
@@ -296,12 +301,31 @@ namespace TrucoRDR2
                     return;
                 }
 
-                MethodInfo target = hooksType.GetMethod(
+                FieldInfo updateSocialField = hooksType.GetField("_updateSocial", staticPrivate);
+                FieldInfo socialTargetField = hooksType.GetField("_socialTarget", staticPrivate);
+                FieldInfo mainTypeField = hooksType.GetField("_mainType", staticPrivate);
+                _companionSocialTargetMethod =
+                    socialTargetField == null ? null : socialTargetField.GetValue(null) as MethodInfo;
+                _companionTuplePedMethod = hooksType.GetMethod("TuplePed", staticPrivate);
+
+                Type mainType = mainTypeField == null ? null : mainTypeField.GetValue(null) as Type;
+                if (mainType != null)
+                {
+                    _companionHideSocialPromptMethod = mainType.GetMethod(
+                        "HideSocialPrompt",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                }
+
+                MethodInfo eligibilityTarget = hooksType.GetMethod(
                     "IsEligibleGenericCandidate", staticPrivate);
-                if (target == null)
+                MethodInfo socialTarget =
+                    updateSocialField == null ? null : updateSocialField.GetValue(null) as MethodInfo;
+
+                if (eligibilityTarget == null || socialTarget == null ||
+                    _companionSocialTargetMethod == null || _companionTuplePedMethod == null)
                 {
                     _companionPromptIntegrationStatus =
-                        "La versión de Companion no expone el filtro de candidatos esperado.";
+                        "La versión de Companion no expone los métodos privados esperados; exclusión incompleta.";
                     return;
                 }
 
@@ -314,9 +338,13 @@ namespace TrucoRDR2
                     return;
                 }
 
-                MethodInfo prefix = typeof(TrucoWorldInteraction).GetMethod(
+                MethodInfo eligibilityPrefix = typeof(TrucoWorldInteraction).GetMethod(
                     "CompanionEligibilityPrefix",
                     BindingFlags.Static | BindingFlags.NonPublic);
+                MethodInfo socialPrefix = typeof(TrucoWorldInteraction).GetMethod(
+                    "CompanionSocialPrefix",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+
                 ConstructorInfo harmonyMethodConstructor = null;
                 ConstructorInfo[] constructors = harmonyMethodType.GetConstructors(
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -331,14 +359,14 @@ namespace TrucoRDR2
                     }
                 }
 
-                if (prefix == null || harmonyMethodConstructor == null)
+                if (eligibilityPrefix == null || socialPrefix == null ||
+                    harmonyMethodConstructor == null)
                 {
                     _companionPromptIntegrationStatus =
                         "No se pudo preparar el filtro Harmony para Companion.";
                     return;
                 }
 
-                object harmonyPrefix = harmonyMethodConstructor.Invoke(new object[] { prefix });
                 MethodInfo patchMethod = null;
                 MethodInfo[] harmonyMethods = harmony.GetType().GetMethods(
                     BindingFlags.Instance | BindingFlags.Public);
@@ -364,20 +392,27 @@ namespace TrucoRDR2
                     return;
                 }
 
-                ParameterInfo[] patchParameters = patchMethod.GetParameters();
-                object[] patchArguments = new object[patchParameters.Length];
-                patchArguments[0] = target;
-                patchArguments[1] = harmonyPrefix;
-                for (int i = 2; i < patchArguments.Length; i++)
-                    patchArguments[i] = null;
+                if (!_companionEligibilityPatchInstalled)
+                {
+                    object harmonyPrefix =
+                        harmonyMethodConstructor.Invoke(new object[] { eligibilityPrefix });
+                    InvokeHarmonyPrefix(patchMethod, harmony, eligibilityTarget, harmonyPrefix);
+                    _companionEligibilityPatchInstalled = true;
+                }
 
-                patchMethod.Invoke(harmony, patchArguments);
-                _companionEligibilityPatchInstalled = true;
+                if (!_companionSocialPromptPatchInstalled)
+                {
+                    object harmonyPrefix =
+                        harmonyMethodConstructor.Invoke(new object[] { socialPrefix });
+                    InvokeHarmonyPrefix(patchMethod, harmony, socialTarget, harmonyPrefix);
+                    _companionSocialPromptPatchInstalled = true;
+                }
+
                 _companionPromptIntegrationStatus =
-                    "Cabalga conmigo excluido únicamente para el NPC del truco.";
+                    "Cabalga conmigo y los prompts sociales de Companion/EnRAGE excluidos únicamente para el NPC del truco.";
 
-                // If Companion had already created its prompt before this patch was installed,
-                // remove that one stale prompt now. The Harmony filter prevents its recreation.
+                // If Companion had already created its prompt before these patches were installed,
+                // remove that stale action now. The Harmony filters prevent it from returning.
                 FieldInfo promptForField = hooksType.GetField("_genericPromptFor", staticPrivate);
                 MethodInfo hidePrompt = hooksType.GetMethod(
                     "HideGenericRecruitPrompt", staticPrivate);
@@ -392,12 +427,24 @@ namespace TrucoRDR2
             catch (Exception ex)
             {
                 _companionPromptIntegrationStatus =
-                    "No se pudo excluir el NPC del prompt Companion: " + ex.GetBaseException().Message;
+                    "No se pudo excluir el NPC de Companion: " + ex.GetBaseException().Message;
             }
         }
 
-        // Harmony prefix for Companion Extension's candidate filter. It rejects exactly this
-        // instance, leaving recruitment and prompts for every other world ped unchanged.
+        private static void InvokeHarmonyPrefix(
+            MethodInfo patchMethod, object harmony, MethodInfo target, object harmonyPrefix)
+        {
+            ParameterInfo[] patchParameters = patchMethod.GetParameters();
+            object[] patchArguments = new object[patchParameters.Length];
+            patchArguments[0] = target;
+            patchArguments[1] = harmonyPrefix;
+            for (int i = 2; i < patchArguments.Length; i++)
+                patchArguments[i] = null;
+
+            patchMethod.Invoke(harmony, patchArguments);
+        }
+
+        // Excludes only the table rival from Companion Extension's generic recruitment candidates.
         private static bool CompanionEligibilityPrefix(Ped __2, ref bool __result)
         {
             if (__2 != null && __2.Exists() &&
@@ -409,6 +456,42 @@ namespace TrucoRDR2
             }
 
             return true;
+        }
+
+        // Companion's base enRAGE social actions share the NPC focus group. Suppress those actions
+        // only while this exact rival is the current social target, leaving all other peds untouched.
+        private static bool CompanionSocialPrefix(object __instance, Ped __0)
+        {
+            if (_companionExcludedPedHandle == 0 || __0 == null || !__0.Exists() ||
+                _companionSocialTargetMethod == null || _companionTuplePedMethod == null)
+                return true;
+
+            try
+            {
+                object tuple = _companionSocialTargetMethod.Invoke(
+                    __instance, new object[] { __0 });
+                Ped target = _companionTuplePedMethod.Invoke(null, new object[] { tuple }) as Ped;
+                if (target == null || !target.Exists() ||
+                    target.Handle != _companionExcludedPedHandle)
+                    return true;
+
+                try
+                {
+                    if (_companionHideSocialPromptMethod != null)
+                        _companionHideSocialPromptMethod.Invoke(__instance, null);
+                }
+                catch
+                {
+                    // The social update itself is still suppressed for this exact target.
+                }
+
+                return false;
+            }
+            catch
+            {
+                // Never suppress social interactions for unrelated peds if target lookup fails.
+                return true;
+            }
         }
 
         private void CreateInteractionPrompt()
