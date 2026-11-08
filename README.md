@@ -132,15 +132,15 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 La primera ubicación está fijada al salón de Valentine. El mod detecta al jugador cerca del punto de interacción, muestra un subtítulo y permite iniciar con `E`.
 
 - Al iniciar se guarda la posición y orientación originales del jugador.
-- Antes de sentar a los personajes, el script crea tres objetos físicos del juego: una mesa de madera (`p_table01x`) y dos sillas (`p_chair02x`), orientadas frente a frente. Tras crear cada objeto, invoca `ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY` para asentarlo en el piso.
-- Las coordenadas Z utilizadas por los escenarios de sentado se toman de las sillas después de aplicar el ajuste al suelo; así los personajes no dependen de una altura fija previa al ajuste.
-- Las orientaciones de sentado se invirtieron respecto de la primera prueba para corregir la rotación opuesta del jugador y del rival.
-- Solo si los tres objetos se crearon correctamente, se crea el rival temporal y se inician los escenarios `PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE` y `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`. Si falla la creación de un objeto, se cancela la preparación para evitar repetir la animación sin muebles.
-- Hay una breve transición durante la que los controles quedan bloqueados; después se abre la mesa de truco existente.
-- Al cerrar con `Esc`, cancelar la preparación o descargar el script, se limpian las tareas, se elimina el rival temporal, se borran los tres objetos creados y se restaura al jugador si sigue vivo, fuera de combate y cerca de la mesa.
-- `Ctrl+F9` sigue disponible como acceso directo de desarrollo para abrir la interfaz sin desplazarse al salón y sin crear muebles.
+- El mod crea una mesa (`p_table01x`) y dos sillas (`p_chair02x`). Intenta apoyar los objetos con `World.CreateProp(..., placeOnGround: true)` y `ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY`.
+- La orientación visual de las sillas se configura separada de la orientación de los personajes, porque la malla de una silla y la dirección de la animación de sentado no siempre comparten el mismo heading.
+- El jugador ya no se teletransporta a las coordenadas de asiento. El jugador y el rival reciben una tarea de navegación (`Task.GoTo`) hacia posiciones de aproximación; al llegar o alcanzar el tiempo máximo, el script inicia los escenarios de sentado con la opción de teletransporte desactivada.
+- Las posiciones de los personajes usan la altura real del jugador al iniciar la interacción, no la coordenada Z del origen de los objetos. Esto evita colocar los pies al nivel del pivote de una silla o mesa.
+- Si falla la creación de un objeto o el inicio de las tareas, se cancela la preparación y se limpian los elementos temporales.
+- Al cerrar con `Esc`, cancelar la preparación o descargar el script, se limpian las tareas, se elimina el rival temporal y se borran los tres objetos; el jugador se restaura si sigue vivo, fuera de combate y cerca de la mesa.
+- `Ctrl+F9` sigue disponible como acceso directo de desarrollo para abrir la interfaz directamente sin desplazarse al salón y sin crear muebles.
 
-El punto de referencia del salón usa las coordenadas `(-307.715, 802.857, 118.979)`. Las posiciones y orientaciones de la mesa y las sillas son una primera distribución aproximada y deben calibrarse en una partida real; desde GitHub no se puede comprobar la altura del piso ni si las animaciones quedan alineadas con los objetos en esa instalación. Esta primera versión no detecta cualquier mesa del mundo ni toma el control de peatones ambientales; administra el mobiliario y su propio rival temporal.
+El punto de referencia aproximado del salón es `(-307.715, 802.857, 118.979)`. La altura de la superficie y los desplazamientos de la mesa y las sillas necesitan una prueba real dentro del juego. Importante: un objeto de silla creado por script no necesariamente incorpora un punto de escenario de asiento como los puntos colocados por los diseñadores del juego. El controlador hace que los personajes caminen hasta la posición y pide al motor que reproduzca el escenario sin teletransporte, pero la alineación final debe verificarse en RDR2.
 
 ### Rival controlado por IA
 
