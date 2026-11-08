@@ -80,11 +80,25 @@ namespace TrucoRDR2
         private bool _worldSetupComplete;
         private bool _sessionActive;
         private const string DealAnimationDictionary = "mini_games@poker_mg@deal";
-        // RDR2's native hashes (the previous constants were not valid for this game).
-        private const int DealAnimationFlags = 25; // AF_LOOPING | AF_UPPERBODY | AF_SECONDARY (1 | 8 | 16)
-        private int _pendingAnimationPedHandle;
-        private string _pendingAnimationClip;
-        private DateTime _pendingAnimationExpiresUtc;
+        private const string PokerBaseAnimationDictionary = "mini_games@poker_mg@base";
+        // Deal/pickup gestures play once. Idle hand poses loop while the cards are held.
+        private const eScriptedAnimFlags DealAnimationFlags =
+            eScriptedAnimFlags.Upperbody | eScriptedAnimFlags.Secondary;
+        private const eScriptedAnimFlags IdleAnimationFlags =
+            eScriptedAnimFlags.Looping | eScriptedAnimFlags.Upperbody | eScriptedAnimFlags.Secondary;
+
+        private sealed class PendingPedAnimation
+        {
+            public int PedHandle;
+            public string Dictionary;
+            public string Clip;
+            public int DurationMilliseconds;
+            public eScriptedAnimFlags Flags;
+            public DateTime ExpiresUtc;
+        }
+
+        private readonly Queue<PendingPedAnimation> _pendingPedAnimations =
+            new Queue<PendingPedAnimation>();
         private bool _hasOriginalPlayerTransform;
         private Vector3 _originalPlayerPosition;
         private float _originalPlayerHeading;
@@ -170,6 +184,7 @@ namespace TrucoRDR2
             EndSession();
             SetPromptEnabled(false);
             DeletePrompt();
+            _pendingPedAnimations.Clear();
 
             // The Harmony filter remains harmless after shutdown because handle 0 is never
             // treated as the excluded ped. A later Truco script instance can set a new handle.
@@ -200,76 +215,102 @@ namespace TrucoRDR2
         /// Plays the poker deal clip on the seated ped using AF_SECONDARY so the
         /// GENERIC_SEAT_CHAIR_TABLE_SCENARIO remains the primary task.
         /// </summary>
+        /// <summary>Plays one RDR2 poker deal gesture on the current dealer.</summary>
         public void PlayCardDealAnimation(bool playerDeals)
         {
             Ped ped = playerDeals ? Game.Player.Character : _opponent;
+            string clip = playerDeals ? "1to4" : "4to1";
+            QueuePedAnimation(ped, DealAnimationDictionary, clip, 450, DealAnimationFlags);
+        }
+
+        /// <summary>Neutral seated idle before the hand starts.</summary>
+        public void PlayNoCardsIdle()
+        {
+            QueuePedAnimation(Game.Player.Character, PokerBaseAnimationDictionary,
+                "no_cards_idle_a", -1, IdleAnimationFlags);
+            QueuePedAnimation(_opponent, PokerBaseAnimationDictionary,
+                "no_cards_idle_a", -1, IdleAnimationFlags);
+        }
+
+        /// <summary>Loop the poker hand-holding idle on both seated players.</summary>
+        public void PlayHoldingCardsIdle()
+        {
+            QueuePedAnimation(Game.Player.Character, PokerBaseAnimationDictionary,
+                "hold_cards_idle_a", -1, IdleAnimationFlags);
+            QueuePedAnimation(_opponent, PokerBaseAnimationDictionary,
+                "hold_cards_idle_a", -1, IdleAnimationFlags);
+        }
+
+        private void QueuePedAnimation(Ped ped, string dictionary, string clip,
+            int durationMilliseconds, eScriptedAnimFlags flags)
+        {
             if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
                 return;
 
-            _pendingAnimationPedHandle = ped.Handle;
-            // The known dealer-seat mapping: 1to4 sends a card to the opposite seat.
-            _pendingAnimationClip = playerDeals ? "1to4" : "4to1";
-            _pendingAnimationExpiresUtc = DateTime.UtcNow.AddSeconds(2.0);
-
             try
             {
-                STREAMING.REQUEST_ANIM_DICT(DealAnimationDictionary);
+                STREAMING.REQUEST_ANIM_DICT(dictionary);
+                _pendingPedAnimations.Enqueue(new PendingPedAnimation
+                {
+                    PedHandle = ped.Handle,
+                    Dictionary = dictionary,
+                    Clip = clip,
+                    DurationMilliseconds = durationMilliseconds,
+                    Flags = flags,
+                    ExpiresUtc = DateTime.UtcNow.AddSeconds(12.0)
+                });
             }
             catch
             {
-                _pendingAnimationPedHandle = 0;
-                _pendingAnimationClip = null;
+                // Missing dictionaries never interrupt the active seating scenario.
             }
         }
 
         private void ProcessPendingCardAnimation()
         {
-            if (_pendingAnimationPedHandle == 0 || string.IsNullOrEmpty(_pendingAnimationClip))
+            if (_pendingPedAnimations.Count == 0)
                 return;
 
-            if (DateTime.UtcNow > _pendingAnimationExpiresUtc)
+            PendingPedAnimation pending = _pendingPedAnimations.Peek();
+            if (DateTime.UtcNow > pending.ExpiresUtc)
             {
-                _pendingAnimationPedHandle = 0;
-                _pendingAnimationClip = null;
+                _pendingPedAnimations.Dequeue();
                 return;
             }
 
             try
             {
-                STREAMING.REQUEST_ANIM_DICT(DealAnimationDictionary);
-                if (!STREAMING.HAS_ANIM_DICT_LOADED(DealAnimationDictionary))
+                STREAMING.REQUEST_ANIM_DICT(pending.Dictionary);
+                if (!STREAMING.HAS_ANIM_DICT_LOADED(pending.Dictionary))
                     return;
 
                 Ped ped = null;
                 Ped player = Game.Player.Character;
-                if (player != null && player.Exists() && player.Handle == _pendingAnimationPedHandle)
+                if (player != null && player.Exists() && player.Handle == pending.PedHandle)
                     ped = player;
                 else if (_opponent != null && _opponent.Exists() &&
-                         _opponent.Handle == _pendingAnimationPedHandle)
+                         _opponent.Handle == pending.PedHandle)
                     ped = _opponent;
 
-                string clip = _pendingAnimationClip;
-                _pendingAnimationPedHandle = 0;
-                _pendingAnimationClip = null;
-
+                _pendingPedAnimations.Dequeue();
                 if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
                     return;
 
-                // Use ScriptHookRDR2DotNet's RDR2 TaskInvoker wrapper: it passes
-                // the RDR2-specific IK/filter arguments and preserves the sit scenario.
+                // The wrapper is used only after HAS_ANIM_DICT_LOADED is true, so it does not
+                // block while streaming. Secondary keeps GENERIC_SEAT_CHAIR_TABLE_SCENARIO.
                 ped.Task.PlayAnimation(
-                    DealAnimationDictionary,
-                    clip,
+                    pending.Dictionary,
+                    pending.Clip,
                     8.0f,
                     -8.0f,
-                    450,
-                    (eScriptedAnimFlags)DealAnimationFlags);
+                    pending.DurationMilliseconds,
+                    pending.Flags);
             }
             catch
             {
-                // A missing dictionary/clip must never break the sitting scenario or match.
-                _pendingAnimationPedHandle = 0;
-                _pendingAnimationClip = null;
+                if (_pendingPedAnimations.Count > 0)
+                    _pendingPedAnimations.Dequeue();
+                // Unknown clips or a streaming failure do not break the hand or seating.
             }
         }
         private void EnsureWorldSetup()
