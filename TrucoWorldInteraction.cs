@@ -80,10 +80,8 @@ namespace TrucoRDR2
         private bool _worldSetupComplete;
         private bool _sessionActive;
         private const string DealAnimationDictionary = "mini_games@poker_mg@deal";
-        private const ulong RequestAnimationDictionary = 0xD3BD40951412FEF6;
-        private const ulong HasAnimationDictionaryLoaded = 0xD031A9162D01088C;
-        private const ulong TaskPlayAnimation = 0xEA47FE3719165B94;
-        private const int SecondaryAnimationFlag = 32; // AF_SECONDARY; preserves the seated scenario
+        // RDR2's native hashes (the previous constants were not valid for this game).
+        private const int DealAnimationFlags = 25; // AF_LOOPING | AF_UPPERBODY | AF_SECONDARY (1 | 8 | 16)
         private int _pendingAnimationPedHandle;
         private string _pendingAnimationClip;
         private DateTime _pendingAnimationExpiresUtc;
@@ -215,7 +213,7 @@ namespace TrucoRDR2
 
             try
             {
-                Function.Call(RequestAnimationDictionary, DealAnimationDictionary);
+                STREAMING.REQUEST_ANIM_DICT(DealAnimationDictionary);
             }
             catch
             {
@@ -239,7 +237,7 @@ namespace TrucoRDR2
             try
             {
                 Function.Call(RequestAnimationDictionary, DealAnimationDictionary);
-                if (!Function.Call<bool>(HasAnimationDictionaryLoaded, DealAnimationDictionary))
+                if (!STREAMING.HAS_ANIM_DICT_LOADED(DealAnimationDictionary))
                     return;
 
                 Ped ped = null;
@@ -257,20 +255,15 @@ namespace TrucoRDR2
                 if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
                     return;
 
-                Function.Call(TaskPlayAnimation,
-                    ped.Handle,
+                // Use ScriptHookRDR2DotNet's RDR2 TaskInvoker wrapper: it passes
+                // the RDR2-specific IK/filter arguments and preserves the sit scenario.
+                ped.Task.PlayAnimation(
                     DealAnimationDictionary,
                     clip,
                     8.0f,
                     -8.0f,
                     450,
-                    SecondaryAnimationFlag,
-                    1.0f,
-                    false,
-                    0,
-                    false,
-                    0,
-                    false);
+                    (eScriptedAnimFlags)DealAnimationFlags);
             }
             catch
             {
