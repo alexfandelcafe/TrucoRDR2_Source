@@ -66,6 +66,7 @@ namespace TrucoRDR2
             _textureDictionary = ReadTextureDictionarySetting();
             _tableToggleBinding = ReadTableToggleBinding();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
+            _worldInteraction = new TrucoWorldInteraction();
             _tablePreview = new TrucoTablePreview(
                 _textureDictionary,
                 FormatKeyBinding(_tableToggleBinding),
@@ -73,7 +74,6 @@ namespace TrucoRDR2
                 ReadFlorEnabledSetting(),
                 ReadSoundEnabledSetting(),
                 _worldInteraction);
-            _worldInteraction = new TrucoWorldInteraction();
 
             string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(scriptDirectory))
