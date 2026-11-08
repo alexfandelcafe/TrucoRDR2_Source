@@ -115,6 +115,12 @@ Enabled=true
 
 Las opciones que no correspondan al canto pendiente se ignoran. El envido se cierra cuando se juega la primera carta. La flor bloquea el envido cuando está habilitada y aparece en la mano.
 
+### Animaciones de cartas
+
+Al jugar una carta, la interfaz anima la textura personalizada desde la mano hacia la baza y el personaje correspondiente reproduce el clip de reparto de póker del juego (mini_games@poker_mg@deal). El jugador usa el clip 1to4 para repartir hacia el asiento opuesto; el rival usa 4to1 en sentido inverso. La animación se ejecuta con AF_SECONDARY para conservar como tarea principal el escenario GENERIC_SEAT_CHAIR_TABLE_SCENARIO. Si el diccionario no llega a cargarse, se omite la animación corporal sin interrumpir la mano.
+
+Las cartas con las caras españolas siguen siendo las texturas del YTD personalizado en la interfaz; no se sustituyen por modelos físicos de cartas del póker base, porque esos modelos no usan automáticamente las texturas españolas del mod.
+
 ### Desarrollo de la partida
 
 - El tanteador se actualiza automáticamente con los puntos de envido, flor y truco.
