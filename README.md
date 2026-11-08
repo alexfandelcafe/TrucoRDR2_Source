@@ -123,6 +123,8 @@ Cada carta se anima desde el centro de la mesa hasta su posición: las tres cart
 
 Antes del reparto, ambos personajes pueden mantener el idle sentado `no_cards_idle_a`. Al terminar de repartir, pasan a `hold_cards_idle_a` para representar que tienen las cartas en la mano. Esas dos poses sí usan `Looping | Upperbody | Secondary` (25): el bucle es necesario para sostener la postura mientras esperan o conservan cartas, y se reemplaza al cambiar de estado. Se usa `Ped.Task.PlayAnimation` de ScriptHookRDR2DotNet y se conserva como tarea principal `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`.
 
+Antes de reproducir cualquiera de esas animaciones, el mod espera 3 segundos desde que inicia el escenario de sentado del jugador. Durante esa espera no se ejecutan animaciones pendientes ni comienza el reparto visual de cartas; el menú de configuración puede mostrarse mientras el jugador termina de sentarse. Al cerrar la sesión se descarta cualquier animación que haya quedado pendiente.
+
 Las caras españolas y los dorsos siguen siendo texturas del YTD personalizado. No se crean cartas físicas 3D: los modelos de cartas del póker base no adoptan automáticamente las texturas españolas del mod.
 
 ### Desarrollo de la partida
