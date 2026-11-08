@@ -834,10 +834,14 @@ namespace TrucoRDR2
                 TrucoPlayer recipient = (dealIndex % 2 == 0)
                     ? _match.Round.Mano
                     : OtherPlayer(_match.Round.Mano);
-                if (recipient == _match.Round.Mano && _worldInteraction != null)
+                if (_worldInteraction != null)
                 {
+                    // The dealer performs one gesture for every card: 1to4 when
+                    // passing it to the other seat, then 2to1 when dealing to themself.
                     TrucoPlayer dealer = OtherPlayer(_match.Round.Mano);
-                    _worldInteraction.PlayCardDealAnimation(dealer == TrucoPlayer.Player);
+                    bool dealingToOther = recipient == _match.Round.Mano;
+                    _worldInteraction.PlayCardDealAnimation(
+                        dealer == TrucoPlayer.Player, dealingToOther);
                 }
             }
 
