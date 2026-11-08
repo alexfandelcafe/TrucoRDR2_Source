@@ -132,12 +132,13 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 La primera ubicación está fijada al salón de Valentine. El mod detecta al jugador cerca del punto de interacción, muestra un subtítulo y permite iniciar con `E`.
 
 - Al iniciar se guarda la posición y orientación originales del jugador.
-- Se crea un rival temporal con el modelo de un habitante de Valentine y se intenta sentar a ambos personajes usando los escenarios `PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE` y `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`.
+- Antes de sentar a los personajes, el script crea tres objetos físicos del juego: una mesa de madera (`p_table01x`) y dos sillas (`p_chair02x`), orientadas frente a frente.
+- Solo si los tres objetos se crearon correctamente, se crea el rival temporal y se inician los escenarios `PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE` y `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`. Si falla la creación de un objeto, se cancela la preparación para evitar repetir la animación sin muebles.
 - Hay una breve transición durante la que los controles quedan bloqueados; después se abre la mesa de truco existente.
-- Al cerrar con `Esc`, el script limpia las tareas, elimina el rival temporal y restaura al jugador si sigue vivo, fuera de combate y cerca de la mesa.
-- `Ctrl+F9` sigue disponible como acceso directo de desarrollo para abrir la interfaz sin desplazarse al salón.
+- Al cerrar con `Esc`, cancelar la preparación o descargar el script, se limpian las tareas, se elimina el rival temporal, se borran los tres objetos creados y se restaura al jugador si sigue vivo, fuera de combate y cerca de la mesa.
+- `Ctrl+F9` sigue disponible como acceso directo de desarrollo para abrir la interfaz sin desplazarse al salón y sin crear muebles.
 
-El punto de referencia del salón usa las coordenadas de mapa `(-307.715, 802.857, 118.979)`. Los dos desplazamientos de asiento son aproximados y deben calibrarse en una partida real: el script no puede verificar desde GitHub si las sillas y los nodos de escenario de esa instalación coinciden exactamente. Esta primera versión no detecta cualquier mesa del mundo ni toma el control de peatones ambientales; crea y administra su propio rival temporal.
+El punto de referencia del salón usa las coordenadas `(-307.715, 802.857, 118.979)`. Las posiciones y orientaciones de la mesa y las sillas son una primera distribución aproximada y deben calibrarse en una partida real; desde GitHub no se puede comprobar la altura del piso ni si las animaciones quedan alineadas con los objetos en esa instalación. Esta primera versión no detecta cualquier mesa del mundo ni toma el control de peatones ambientales; administra el mobiliario y su propio rival temporal.
 
 ### Rival controlado por IA
 
