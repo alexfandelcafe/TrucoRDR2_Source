@@ -11,23 +11,11 @@ using RDR2.UI;
 namespace TrucoRDR2
 {
     /// <summary>
-    /// Texture validation plus an early interactive hand prototype.
-    /// F7 toggles the texture viewer; Ctrl+F9 opens the mano a mano table against a basic strategic opponent.
+    /// Texture validation plus an interactive mano a mano truco table.
+    /// F7 toggles the texture viewer; the table opens through the rival's contextual prompt.
     /// </summary>
     public sealed class TrucoScript : Script
     {
-        private struct KeyBinding
-        {
-            public readonly Keys Key;
-            public readonly Keys Modifiers;
-
-            public KeyBinding(Keys key, Keys modifiers)
-            {
-                Key = key;
-                Modifiers = modifiers;
-            }
-        }
-
         private const string DefaultTextureDictionary = "trucor2_cards";
         private const Keys TogglePreviewKey = Keys.F7;
         private const int CardsShown = 3;
@@ -37,7 +25,6 @@ namespace TrucoRDR2
         private const double MissingDictionaryGraceSeconds = 5.0;
 
         private readonly string _textureDictionary;
-        private readonly KeyBinding _tableToggleBinding;
         private readonly string[] _textureNames;
         private readonly PointF[] _cardPositions;
         private readonly Sprite[] _sprites = new Sprite[CardsShown];
@@ -51,7 +38,6 @@ namespace TrucoRDR2
 
         private bool _previewEnabled;
         private bool _toggleKeyDown;
-        private bool _tableToggleKeyDown;
         private bool _textureRequestSent;
         private bool _spritesCreated;
         private int _firstCardIndex;
@@ -64,12 +50,10 @@ namespace TrucoRDR2
         {
             Interval = 0;
             _textureDictionary = ReadTextureDictionarySetting();
-            _tableToggleBinding = ReadTableToggleBinding();
             _textureNames = CardTextureCatalog.CreateTrucoDeckTextureNames();
             _worldInteraction = new TrucoWorldInteraction();
             _tablePreview = new TrucoTablePreview(
                 _textureDictionary,
-                FormatKeyBinding(_tableToggleBinding),
                 ReadMatchTargetSetting(),
                 ReadFlorEnabledSetting(),
                 ReadSoundEnabledSetting(),
@@ -126,39 +110,6 @@ namespace TrucoRDR2
             // to the seated rival. E is not intercepted globally, so ordinary game
             // interactions keep their normal bindings outside that prompt.
 
-            if (e.KeyCode == _tableToggleBinding.Key && e.Modifiers == _tableToggleBinding.Modifiers)
-            {
-                // Keep the direct shortcut as a development fallback.
-                if (!_tableToggleKeyDown)
-                {
-                    _tableToggleKeyDown = true;
-                    if (_tablePreview.IsVisible)
-                    {
-                        if (_tablePreview.IsRoundComplete)
-                        {
-                            _tablePreview.ContinueAfterResult();
-                            WriteDiagnostic("Se avanzó a la siguiente mano o se inició una nueva partida.");
-                        }
-                        else
-                        {
-                            _tablePreview.Close();
-                            WriteDiagnostic("Mesa de prueba cerrada.");
-                        }
-                    }
-                    else
-                    {
-                        if (_previewEnabled)
-                            SetPreviewEnabled(false);
-
-                        _tablePreview.Start();
-                        WriteDiagnostic("Mesa de prueba activada mediante el atajo de desarrollo.");
-                    }
-                }
-
-                e.Handled = true;
-                return;
-            }
-
             if (e.KeyCode == TogglePreviewKey)
             {
                 // The F7 texture viewer and the table prototype are mutually exclusive.
@@ -211,13 +162,6 @@ namespace TrucoRDR2
 
         private void OnKeyUp(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == _tableToggleBinding.Key && _tableToggleKeyDown)
-            {
-                _tableToggleKeyDown = false;
-                e.Handled = true;
-                return;
-            }
-
             if (e.KeyCode == TogglePreviewKey)
             {
                 _toggleKeyDown = false;
@@ -598,19 +542,6 @@ namespace TrucoRDR2
             }
         }
 
-        private static string FormatKeyBinding(KeyBinding binding)
-        {
-            string result = string.Empty;
-            if ((binding.Modifiers & Keys.Control) != Keys.None)
-                result += "Ctrl+";
-            if ((binding.Modifiers & Keys.Shift) != Keys.None)
-                result += "Shift+";
-            if ((binding.Modifiers & Keys.Alt) != Keys.None)
-                result += "Alt+";
-
-            return result + binding.Key;
-        }
-
         private static float LayoutScale
         {
             get
@@ -659,107 +590,6 @@ namespace TrucoRDR2
 
             // Text already scales with physical resolution; apply only the extra letterbox fit.
             return value * LayoutScale * RDR2.UI.Screen.Height / resolution.Height;
-        }
-
-        private static KeyBinding ReadTableToggleBinding()
-        {
-            KeyBinding defaultBinding = new KeyBinding(Keys.F9, Keys.Control);
-
-            try
-            {
-                string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-                if (string.IsNullOrEmpty(scriptDirectory))
-                    return defaultBinding;
-
-                string iniPath = Path.Combine(scriptDirectory, "TrucoRDR2.ini");
-                if (!File.Exists(iniPath))
-                    return defaultBinding;
-
-                string currentSection = string.Empty;
-                foreach (string rawLine in File.ReadAllLines(iniPath))
-                {
-                    string line = rawLine.Trim();
-                    if (line.Length == 0 || line.StartsWith(";") || line.StartsWith("#"))
-                        continue;
-
-                    if (line.StartsWith("[") && line.EndsWith("]"))
-                    {
-                        currentSection = line.Substring(1, line.Length - 2).Trim();
-                        continue;
-                    }
-
-                    if (!string.Equals(currentSection, "Controls", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    int equalsIndex = line.IndexOf('=');
-                    if (equalsIndex <= 0)
-                        continue;
-
-                    string key = line.Substring(0, equalsIndex).Trim();
-                    string value = line.Substring(equalsIndex + 1).Trim();
-                    if (string.Equals(key, "TableToggle", StringComparison.OrdinalIgnoreCase) && value.Length > 0)
-                        return ParseKeyBinding(value, defaultBinding);
-                }
-            }
-            catch
-            {
-                // A malformed optional control setting must not prevent the script from loading.
-            }
-
-            return defaultBinding;
-        }
-
-        private static KeyBinding ParseKeyBinding(string value, KeyBinding defaultBinding)
-        {
-            Keys key = Keys.None;
-            Keys modifiers = Keys.None;
-
-            string[] parts = value.Split('+');
-            foreach (string rawPart in parts)
-            {
-                string part = rawPart.Trim();
-                if (part.Length == 0)
-                    return defaultBinding;
-
-                if (string.Equals(part, "Ctrl", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(part, "Control", StringComparison.OrdinalIgnoreCase))
-                {
-                    modifiers |= Keys.Control;
-                }
-                else if (string.Equals(part, "Shift", StringComparison.OrdinalIgnoreCase))
-                {
-                    modifiers |= Keys.Shift;
-                }
-                else if (string.Equals(part, "Alt", StringComparison.OrdinalIgnoreCase))
-                {
-                    modifiers |= Keys.Alt;
-                }
-                else
-                {
-                    Keys parsedKey;
-                    if (key != Keys.None ||
-                        !Enum.TryParse(part, true, out parsedKey) ||
-                        !Enum.IsDefined(typeof(Keys), parsedKey) ||
-                        parsedKey == Keys.None ||
-                        (parsedKey & Keys.Modifiers) != Keys.None ||
-                        parsedKey == Keys.ControlKey ||
-                        parsedKey == Keys.ShiftKey ||
-                        parsedKey == Keys.Menu ||
-                        parsedKey == Keys.F7 ||
-                        parsedKey == Keys.F8 ||
-                        parsedKey == Keys.F6 ||
-                        parsedKey == Keys.Insert)
-                    {
-                        return defaultBinding;
-                    }
-
-                    key = parsedKey;
-                }
-            }
-
-            return key == Keys.None
-                ? defaultBinding
-                : new KeyBinding(key, modifiers);
         }
 
         private static int ReadMatchTargetSetting()
