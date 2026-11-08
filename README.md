@@ -115,11 +115,13 @@ Enabled=true
 
 Las opciones que no correspondan al canto pendiente se ignoran. El envido se cierra cuando se juega la primera carta. La flor bloquea el envido cuando está habilitada y aparece en la mano.
 
-### Animaciones de cartas
+### Menú, reparto y animaciones de cartas
 
-Al aceptar el prompt contextual `Jugar al truco`, la partida mano a mano comienza directamente y se inicia el reparto inicial de seis cartas, alternando entre mano y repartidor. Durante unos 3,6 segundos se muestran únicamente la mesa y las cartas que van llegando a cada mano; el marcador, las instrucciones y los controles de la partida aparecen cuando termina el sexto movimiento. El reparto espera a que el YTD `trucor2_cards` esté cargado; si falta, se informa en pantalla en lugar de mostrar cartas invisibles.
+Al aceptar el prompt contextual `Jugar al truco`, aparece primero el menú de configuración que permite elegir 15/30 puntos, activar/desactivar flor y activar/desactivar sonidos. El reparto no comienza al abrir el menú: comienza al seleccionar `INICIAR PARTIDA` y confirmar con Enter. Después se reparten seis cartas alternadamente entre mano y repartidor. Durante unos 3,6 segundos se muestran únicamente la mesa y las cartas que van llegando; marcador, instrucciones y controles aparecen al terminar el sexto movimiento. La secuencia espera a que el YTD `trucor2_cards` esté cargado; si falta, muestra un aviso en vez de dejar elegir cartas invisibles.
 
-Cada carta se anima desde el centro de la mesa hasta su posición: las tres cartas propias muestran su cara española y las tres del rival muestran `reverso`. En las tres entregas hacia el asiento opuesto, el repartidor reproduce el clip correspondiente del diccionario `mini_games@poker_mg@deal`: `1to4` cuando reparte el jugador y `4to1` cuando reparte el rival. Se usa el wrapper `Ped.Task.PlayAnimation` de ScriptHookRDR2DotNet con las banderas RDR2 `Looping | Upperbody | Secondary` (valor combinado 25; `Secondary` vale 16 en esta API), para conservar como tarea principal `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`. Una vez repartidas, la mano queda lista y las animaciones de cartas jugadas siguen siendo movimientos de las texturas de la interfaz.
+Cada carta se anima desde el centro de la mesa hasta su posición: las tres cartas propias muestran su cara española y las tres del rival muestran `reverso`. En las tres entregas hacia el asiento opuesto, el repartidor reproduce una vez el clip del diccionario `mini_games@poker_mg@deal`: `1to4` cuando reparte el jugador y `4to1` cuando reparte el rival. Estos gestos usan `Upperbody | Secondary` (24), sin looping.
+
+Antes del reparto, ambos personajes pueden mantener el idle sentado `no_cards_idle_a`. Al terminar de repartir, pasan a `hold_cards_idle_a` para representar que tienen las cartas en la mano. Esas dos poses sí usan `Looping | Upperbody | Secondary` (25): el bucle es necesario para sostener la postura mientras esperan o conservan cartas, y se reemplaza al cambiar de estado. Se usa `Ped.Task.PlayAnimation` de ScriptHookRDR2DotNet y se conserva como tarea principal `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`.
 
 Las caras españolas y los dorsos siguen siendo texturas del YTD personalizado. No se crean cartas físicas 3D: los modelos de cartas del póker base no adoptan automáticamente las texturas españolas del mod.
 
