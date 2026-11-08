@@ -56,6 +56,7 @@
     <Compile Include="TrucoDeck.cs" />
     <Compile Include="TrucoRound.cs" />
     <Compile Include="TrucoTablePreview.cs" />
+    <Compile Include="TrucoWorldInteraction.cs" />
     <Compile Include="TrucoMatch.cs" />
     <Compile Include="TrucoAudio.cs" />
   </ItemGroup>
