@@ -68,7 +68,6 @@ namespace TrucoRDR2
         private const ulong IsPedHogtied = 0x3AA24CCC0D451379;
         private const ulong IsPedFallingOver = 0x3E592D0486DEC0F6;
         private const ulong IsPedGettingUp = 0x2A74E1D5F2F00EEC;
-        private const ulong IsPedUsingAnyScenario = 0x57AB4A3080F85143;
 
         private readonly uint _seatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
 
@@ -236,6 +235,9 @@ namespace TrucoRDR2
                     _opponent != null && _opponent.Exists() &&
                     _opponentScenarioStarted &&
                     _interactionPrompt != 0;
+
+                if (_worldSetupComplete)
+                    LastError = null;
             }
             catch (Exception ex)
             {
