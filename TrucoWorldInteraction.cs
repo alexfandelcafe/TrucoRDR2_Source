@@ -245,7 +245,8 @@ namespace TrucoRDR2
         public void PlayCardDealAnimation(bool playerDeals)
         {
             Ped ped = playerDeals ? Game.Player.Character : _opponent;
-            string clip = playerDeals ? "1to4" : "4to1";
+            // The tested reverse-direction clip is 2to1; 4to1 does not play for this seated rival.
+            string clip = playerDeals ? "1to4" : "2to1";
             QueuePedAnimation(ped, DealAnimationDictionary, clip, 450, DealAnimationFlags);
         }
 
@@ -444,7 +445,7 @@ namespace TrucoRDR2
 
             _nextDeckPropAttemptUtc = DateTime.UtcNow.AddSeconds(SetupRetrySeconds);
             Vector3 deckPosition = _tableProp.GetOffsetPosition(
-                new Vector3(0.18f, -0.18f, 0.86f));
+                new Vector3(0.18f, -0.18f, 0.72f));
             Vector3 deckRotation = new Vector3(0.0f, 0.0f, TableHeading - 15.0f);
 
             _deckProp = CreateVisualProp(
