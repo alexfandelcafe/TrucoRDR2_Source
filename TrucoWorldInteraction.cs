@@ -1,5 +1,4 @@
 using System;
-using System.Drawing;
 using RDR2;
 using RDR2.Math;
 using RDR2.Native;
@@ -192,6 +191,14 @@ namespace TrucoRDR2
                    dx * dx + dy * dy + dz * dz <= InteractionRadius * InteractionRadius;
         }
 
+        private static bool IsWithinSessionArea(Vector3 position)
+        {
+            float dx = position.X - LocationCenter.X;
+            float dy = position.Y - LocationCenter.Y;
+            float dz = position.Z - LocationCenter.Z;
+            return Math.Abs(dz) <= 6.0f && dx * dx + dy * dy + dz * dz <= 144.0f;
+        }
+
         private void DisableControlsDuringPreparation()
         {
             try
@@ -242,7 +249,7 @@ namespace TrucoRDR2
                 if (_hasOriginalPlayerTransform &&
                     player != null && player.Exists() && !player.IsDeadOrDying &&
                     !player.IsInCombat &&
-                    IsInsideInteractionRange(player.Position))
+                    IsWithinSessionArea(player.Position))
                 {
                     player.Task.ClearTasks(true);
                     player.PositionNoOffset = _originalPlayerPosition;
