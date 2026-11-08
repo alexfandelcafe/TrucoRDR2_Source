@@ -20,12 +20,12 @@ namespace TrucoRDR2
         private static readonly Vector3 LocationCenter =
             new Vector3(-307.7149f, 802.8571f, 118.9794f);
         private static readonly Vector3 TablePosition = LocationCenter;
-        // Place the new Windsor chairs at the current tested seat coordinates. They are kept at
-        // the known interior floor Z directly; grounding them can snap them onto the tabletop collision.
+        // Move both Windsor chairs inward to 1.0 m from the table center. Keep them at
+        // the known interior floor Z; grounding them can snap them onto tabletop collision.
         private static readonly Vector3 PlayerSeat =
-            new Vector3(-309.05f, 802.8571f, 118.9794f);
+            new Vector3(-308.7149f, 802.8571f, 118.9794f);
         private static readonly Vector3 OpponentSeat =
-            new Vector3(-306.38f, 802.8571f, 118.9794f);
+            new Vector3(-306.7149f, 802.8571f, 118.9794f);
 
         private const string TableModelName = "p_table06x";
         private const string ChairModelName = "p_windsorchair03x";
@@ -63,7 +63,7 @@ namespace TrucoRDR2
         private const ulong IsPedFallingOver = 0x3E592D0486DEC0F6;
         private const ulong IsPedGettingUp = 0x2A74E1D5F2F00EEC;
 
-        private readonly uint _seatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
+        private readonly uint _seatScenario = Game.Joaat("GENERIC_SEAT_CHAIR_TABLE_SCENARIO");
 
         private Vector3 _playerSeatPosition;
         private Vector3 _opponentSeatPosition;
@@ -240,7 +240,7 @@ namespace TrucoRDR2
 
                 if (_opponent != null && _opponent.Exists() && !_opponentScenarioStarted)
                 {
-                    // This is the same chair scenario confirmed in-game for both peds.
+                    // Use the neutral table-seating scenario so the rival does not start a smoking activity.
                     // Teleport is intentional: the rival is seated as part of world setup.
                     ConfigureOpponentFocus();
                     _opponent.Task.StartScenario(
@@ -625,7 +625,7 @@ namespace TrucoRDR2
                 player.Heading = PlayerHeading;
 
                 // No approach task or walking phase: the player snaps directly into
-                // the same chair scenario used by the seated opponent.
+                // the same table-seating scenario used by the seated opponent.
                 player.Task.StartScenario(
                     _seatScenario, _playerSeatPosition, -1, true, true);
 
