@@ -44,10 +44,9 @@ namespace TrucoRDR2
         private const ulong PromptSetVisible = 0x71215ACCFDE075EE;
         private const ulong PromptSetEnabled = 0x8A0FB4D03A630D21;
         private const ulong PromptSetGroup = 0x2F11D3A254169EA4;
+        private const ulong PromptGetGroupIdForTargetEntity = 0xB796970BD125FCE8;
         private const ulong PromptSetActiveGroupThisFrame = 0xC65A45D4453C2627;
         private const uint InteractControlHash = 0xD51B784F;
-        // RDR2 prompt groups are numeric IDs. Keep this stable and inside the documented range.
-        private const int InteractionPromptGroupId = 0x545255;
         private const ulong PromptContextSetPoint = 0xAE84C5EE2C384FB3;
         private const ulong PromptContextSetRadius = 0x0C718001B77CA468;
         private const ulong PromptIsValid = 0x347469FBDD1589A9;
@@ -130,8 +129,8 @@ namespace TrucoRDR2
                 return false;
             }
 
-            // The range gate keeps the exclusive group from replacing other prompts
-            // elsewhere in the world. The context radius remains centered on the NPC.
+            // The range gate prevents this NPC's group from replacing other normal prompt
+            // groups elsewhere in the world. The context point follows the NPC.
             UpdatePromptAnchor();
             SetPromptEnabled(true);
             ActivateExclusivePromptGroup();
@@ -265,10 +264,13 @@ namespace TrucoRDR2
                 Function.Call(PromptRegisterEnd, prompt);
 
                 _interactionPrompt = prompt;
-                // Use a dedicated nonzero group rather than the NPC's generic entity group.
-                // The context point is moved with the NPC every frame, while this exclusive
-                // active group keeps other normal prompt groups from taking the screen.
-                _interactionPromptGroup = InteractionPromptGroupId;
+                // Attach the action to the NPC's own focus group. This is the group RDR2
+                // activates when the player targets/focuses this ped.
+                _interactionPromptGroup = Function.Call<int>(
+                    PromptGetGroupIdForTargetEntity, _opponent.Handle);
+                if (_interactionPromptGroup == 0)
+                    throw new InvalidOperationException(
+                        "RDR2 no devolvió un grupo de interacción válido para el NPC.");
 
                 Function.Call(PromptSetGroup, _interactionPrompt, _interactionPromptGroup, 0);
                 Function.Call(PromptContextSetPoint, _interactionPrompt,
@@ -317,8 +319,9 @@ namespace TrucoRDR2
 
             try
             {
-                // RDR2 normal prompt groups are exclusive: this keeps this one
-                // contextual action as the active group while the player is beside the rival.
+                // RDR2 normal prompt groups are exclusive. We activate the NPC's own
+                // target group while the player is beside the rival, so this prompt wins
+                // over unrelated normal prompt groups.
                 Function.Call(PromptSetActiveGroupThisFrame,
                     unchecked((uint)_interactionPromptGroup),
                     MISC.VAR_STRING(10, "LITERAL_STRING", "SALÓN DE VALENTINE"),
