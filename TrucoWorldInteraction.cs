@@ -420,13 +420,15 @@ namespace TrucoRDR2
                 default: return GenericCardPropModelName;
             }
 
+            // The native Valentine card prop naming uses c/d/h/s, not full suit names.
+            // Map the four Spanish suits to the closest traditional poker-suit artwork.
             string suit;
             switch (card.Suit)
             {
-                case SpanishSuit.Bastos: suit = "club"; break;
-                case SpanishSuit.Copas: suit = "heart"; break;
-                case SpanishSuit.Espadas: suit = "spade"; break;
-                case SpanishSuit.Oros: suit = "diamond"; break;
+                case SpanishSuit.Bastos: suit = "c"; break;
+                case SpanishSuit.Copas: suit = "h"; break;
+                case SpanishSuit.Espadas: suit = "s"; break;
+                case SpanishSuit.Oros: suit = "d"; break;
                 default: return GenericCardPropModelName;
             }
 
