@@ -125,7 +125,7 @@ Antes del reparto, ambos personajes pueden mantener el idle sentado `no_cards_id
 
 Antes de reproducir cualquiera de esas animaciones, el mod espera 3 segundos desde que inicia el escenario de sentado del jugador. Durante esa espera no se ejecutan animaciones pendientes ni comienza el reparto visual de cartas; el menú de configuración puede mostrarse mientras el jugador termina de sentarse. Al cerrar la sesión se descarta cualquier animación que haya quedado pendiente.
 
-Las caras españolas y los dorsos siguen siendo texturas del YTD personalizado. No se crean cartas físicas 3D: los modelos de cartas del póker base no adoptan automáticamente las texturas españolas del mod.
+Además de la interfaz, ahora se crean objetos 3D en el mundo: el mazo `p_cardssplit01x_val` queda sobre la mesa y se adjuntan tres cartas a `SKEL_L_Finger13` de cada jugador. Las cartas propias usan modelos nativos `p_crd_[rango]_[palo]01x_val`; el rival sostiene dorsos `p_crd_joker01x_val`. Si un modelo individual no está disponible, se intenta el objeto genérico `p_cs_pokercard01x`; el mazo tiene como alternativa `p_cards01x`. Los modelos físicos son los del mazo de póker de Valentine: sus palos se aproximan a los españoles (bastos/clubes, copas/corazones, espadas/picas, oros/diamantes), por lo que no reproducen literalmente el arte español del YTD. Las caras españolas exactas siguen en la interfaz 2D.
 
 ### Desarrollo de la partida
 
@@ -175,7 +175,7 @@ La distribución usa un diseño de referencia 1920×1080 y se adapta con letterb
 ## Integración y comportamiento
 
 - La mesa desactiva los grupos de controles de jugador, cámara y frontend mientras está abierta para evitar acciones del personaje desde detrás de la interfaz.
-- La partida no congela el mundo: si una caída o un ataque reduce la salud del personaje, el overlay se cierra automáticamente, pero conserva la mano y el tanteador para reanudar con Ctrl+F9.
+- La partida no congela el mundo. Al pulsar Escape se cierra la mesa, se descarta la partida y se vuelve al menú en la próxima interacción; no se conserva la mano ni el tanteador. El jugador recupera su posición original. El rival permanece sentado en el mismo escenario y solo se limpia su tarea secundaria de animación.
 - La combinación de apertura se lee al cargar el script desde la sección [Controls] de TrucoRDR2.ini; los cambios requieren volver a cargar/reiniciar el script.
 - La escala y las posiciones están basadas en un marco de 1920×1080 que se adapta con letterboxing a proporciones distintas. Se pueden retocar durante la prueba en el juego.
 
