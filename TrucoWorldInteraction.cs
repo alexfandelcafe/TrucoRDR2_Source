@@ -38,6 +38,8 @@ namespace TrucoRDR2
         private const float InteractionRadius = 4.5f;
         private const double SetupRetrySeconds = 3.0;
         private const double ScenarioWarmupSeconds = 1.5;
+        // Let the player's chair-entry animation finish before any poker pose or deal gesture.
+        private const double PlayerSeatingWarmupSeconds = 3.0;
 
         // Standalone copy of enRAGE's MakePrompt setup sequence.
         private const ulong PromptSetText = 0x5DD02A8318420DD7;
@@ -103,6 +105,7 @@ namespace TrucoRDR2
         private Vector3 _originalPlayerPosition;
         private float _originalPlayerHeading;
         private DateTime _opponentScenarioStartedUtc;
+        private DateTime _playerScenarioStartedUtc;
         private DateTime _nextSetupAttemptUtc;
 
         // Optional runtime bridge: exclude only our rival from Companion Extension recruitment.
@@ -116,6 +119,15 @@ namespace TrucoRDR2
         private string _companionPromptIntegrationStatus = "Esperando la extensión Companion/EnRAGE.";
 
         public bool IsSessionActive { get { return _sessionActive; } }
+        public bool IsPlayerSeatedReady
+        {
+            get
+            {
+                return _sessionActive && _playerScenarioStartedUtc != DateTime.MinValue &&
+                       (DateTime.UtcNow - _playerScenarioStartedUtc).TotalSeconds >=
+                       PlayerSeatingWarmupSeconds;
+            }
+        }
         public bool SessionWasInterrupted { get; private set; }
         public string LastError { get; private set; }
         public string CompanionPromptIntegrationStatus { get { return _companionPromptIntegrationStatus; } }
@@ -268,6 +280,11 @@ namespace TrucoRDR2
 
         private void ProcessPendingCardAnimation()
         {
+            // StartScenario begins the chair-entry transition asynchronously. Keep every
+            // queued poker animation (player and rival) behind the player's seating warm-up.
+            if (_sessionActive && !IsPlayerSeatedReady)
+                return;
+
             // Rotate requests whose dictionaries are still streaming instead of letting one
             // missing dictionary block an animation from a different dictionary.
             int queuedCount = _pendingPedAnimations.Count;
@@ -752,6 +769,7 @@ namespace TrucoRDR2
                 // the same table-seating scenario used by the seated opponent.
                 player.Task.StartScenario(
                     _seatScenario, _playerSeatPosition, -1, true, true);
+                _playerScenarioStartedUtc = DateTime.UtcNow;
 
                 _sessionActive = true;
                 SetPromptEnabled(false);
@@ -876,6 +894,8 @@ namespace TrucoRDR2
         private void EndSession()
         {
             _sessionActive = false;
+            _playerScenarioStartedUtc = DateTime.MinValue;
+            _pendingPedAnimations.Clear();
 
             try
             {
