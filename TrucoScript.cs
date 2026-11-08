@@ -58,6 +58,7 @@ namespace TrucoRDR2
         private DateTime _textureRequestTimeUtc;
         private string _lastDiagnosticState;
         private string _lastWorldInteractionError;
+        private string _lastCompanionPromptIntegrationStatus;
 
         public TrucoScript()
         {
@@ -239,6 +240,13 @@ namespace TrucoRDR2
             else
             {
                 _lastWorldInteractionError = null;
+            }
+
+            string companionStatus = _worldInteraction.CompanionPromptIntegrationStatus;
+            if (!string.Equals(_lastCompanionPromptIntegrationStatus, companionStatus, StringComparison.Ordinal))
+            {
+                _lastCompanionPromptIntegrationStatus = companionStatus;
+                WriteDiagnostic("Integración del prompt Companion: " + companionStatus);
             }
 
             if (_worldInteraction.SessionWasInterrupted && _tablePreview.IsVisible)
