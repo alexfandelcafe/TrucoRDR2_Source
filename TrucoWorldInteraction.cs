@@ -79,6 +79,14 @@ namespace TrucoRDR2
         private bool _opponentScenarioStarted;
         private bool _worldSetupComplete;
         private bool _sessionActive;
+        private const string DealAnimationDictionary = "mini_games@poker_mg@deal";
+        private const ulong RequestAnimationDictionary = 0xD3BD40951412FEF6;
+        private const ulong HasAnimationDictionaryLoaded = 0xD031A9162D01088C;
+        private const ulong TaskPlayAnimation = 0xEA47FE3719165B94;
+        private const int SecondaryAnimationFlag = 32; // AF_SECONDARY; preserves the seated scenario
+        private int _pendingAnimationPedHandle;
+        private string _pendingAnimationClip;
+        private DateTime _pendingAnimationExpiresUtc;
         private bool _hasOriginalPlayerTransform;
         private Vector3 _originalPlayerPosition;
         private float _originalPlayerHeading;
@@ -108,6 +116,7 @@ namespace TrucoRDR2
             SessionWasInterrupted = false;
             EnsureWorldSetup();
             EnsureCompanionRecruitmentExclusion();
+            ProcessPendingCardAnimation();
 
             if (_sessionActive)
             {
@@ -189,6 +198,87 @@ namespace TrucoRDR2
             _worldSetupComplete = false;
         }
 
+        /// <summary>
+        /// Plays the poker deal clip on the seated ped using AF_SECONDARY so the
+        /// GENERIC_SEAT_CHAIR_TABLE_SCENARIO remains the primary task.
+        /// </summary>
+        public void PlayCardDealAnimation(bool playerDeals)
+        {
+            Ped ped = playerDeals ? Game.Player.Character : _opponent;
+            if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
+                return;
+
+            _pendingAnimationPedHandle = ped.Handle;
+            // The known dealer-seat mapping: 1to4 sends a card to the opposite seat.
+            _pendingAnimationClip = playerDeals ? "1to4" : "4to1";
+            _pendingAnimationExpiresUtc = DateTime.UtcNow.AddSeconds(2.0);
+
+            try
+            {
+                Function.Call(RequestAnimationDictionary, DealAnimationDictionary);
+            }
+            catch
+            {
+                _pendingAnimationPedHandle = 0;
+                _pendingAnimationClip = null;
+            }
+        }
+
+        private void ProcessPendingCardAnimation()
+        {
+            if (_pendingAnimationPedHandle == 0 || string.IsNullOrEmpty(_pendingAnimationClip))
+                return;
+
+            if (DateTime.UtcNow > _pendingAnimationExpiresUtc)
+            {
+                _pendingAnimationPedHandle = 0;
+                _pendingAnimationClip = null;
+                return;
+            }
+
+            try
+            {
+                Function.Call(RequestAnimationDictionary, DealAnimationDictionary);
+                if (!Function.Call<bool>(HasAnimationDictionaryLoaded, DealAnimationDictionary))
+                    return;
+
+                Ped ped = null;
+                Ped player = Game.Player.Character;
+                if (player != null && player.Exists() && player.Handle == _pendingAnimationPedHandle)
+                    ped = player;
+                else if (_opponent != null && _opponent.Exists() &&
+                         _opponent.Handle == _pendingAnimationPedHandle)
+                    ped = _opponent;
+
+                string clip = _pendingAnimationClip;
+                _pendingAnimationPedHandle = 0;
+                _pendingAnimationClip = null;
+
+                if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
+                    return;
+
+                Function.Call(TaskPlayAnimation,
+                    ped.Handle,
+                    DealAnimationDictionary,
+                    clip,
+                    8.0f,
+                    -8.0f,
+                    450,
+                    SecondaryAnimationFlag,
+                    1.0f,
+                    false,
+                    0,
+                    false,
+                    0,
+                    false);
+            }
+            catch
+            {
+                // A missing dictionary/clip must never break the sitting scenario or match.
+                _pendingAnimationPedHandle = 0;
+                _pendingAnimationClip = null;
+            }
+        }
         private void EnsureWorldSetup()
         {
             if (_worldSetupComplete || DateTime.UtcNow < _nextSetupAttemptUtc)
