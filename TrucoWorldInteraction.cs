@@ -40,8 +40,8 @@ namespace TrucoRDR2
         private const ulong PromptSetText = 0x5DD02A8318420DD7;
         private const ulong PromptSetPriority = 0xCA24F528D0D16289;
         private const ulong PromptSetStandardMode = 0xCC6656799977741B;
-        private const ulong PromptSetType = 0xF4A5C4509BF923B1;
         private const ulong PromptSetAttribute = 0x560E76D5E2E1803F;
+        private const ulong PromptSetOrderingAsInputType = 0x2F385ECC5200938D;
         private const ulong PromptSetVisible = 0x71215ACCFDE075EE;
         private const ulong PromptSetEnabled = 0x8A0FB4D03A630D21;
         private const ulong PromptSetGroup = 0x2F11D3A254169EA4;
@@ -200,10 +200,13 @@ namespace TrucoRDR2
                 if (_opponentChairProp == null || !_opponentChairProp.Exists())
                     _opponentChairProp = CreateFurnitureProp(ChairModelName, OpponentSeat, OpponentChairHeading);
 
+                // Scenario coordinates are chair-origin coordinates. The sitting task
+                // performs its own vertical alignment; adding +0.50 m put the ped above the
+                // seat and could leave the NPC appearing on the tabletop.
                 _playerSeatPosition =
-                    _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
+                    _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.0f));
                 _opponentSeatPosition =
-                    _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
+                    _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.0f));
 
                 // Spawn the rival only once. A dead or removed rival is deliberately
                 // not replaced, so the interaction stays unavailable after that event.
@@ -225,12 +228,14 @@ namespace TrucoRDR2
                     _opponent.BlockPermanentEvents = false;
                     _opponent.NeverLeavesGroup = false;
                     _opponent.Heading = OpponentHeading;
+                    ConfigureOpponentFocus();
                 }
 
                 if (_opponent != null && _opponent.Exists() && !_opponentScenarioStarted)
                 {
                     // This is the same chair scenario confirmed in-game for both peds.
                     // Teleport is intentional: the rival is seated as part of world setup.
+                    ConfigureOpponentFocus();
                     _opponent.Task.StartScenario(
                         _seatScenario, _opponentSeatPosition, -1, true, true);
 
@@ -498,6 +503,18 @@ namespace TrucoRDR2
             }
         }
 
+        private void ConfigureOpponentFocus()
+        {
+            if (_opponent == null || !_opponent.Exists())
+                return;
+
+            // Force the normal RDR2 interaction-lock-on path for this scenario ped.
+            // These flags are also used by companion implementations when a ped must
+            // keep its native focus/aim interaction available.
+            PED.SET_PED_CONFIG_FLAG(_opponent.Handle, 297, true);
+            PED.SET_PED_CONFIG_FLAG(_opponent.Handle, 301, false);
+        }
+
         private void CreateInteractionPrompt()
         {
             int prompt = Function.Call<int>(PromptRegisterBegin);
@@ -507,8 +524,10 @@ namespace TrucoRDR2
             try
             {
                 // INPUT_CONTEXT_Y is E on the default PC keyboard layout.
-                Function.Call(PromptSetType, prompt, 0);
                 Function.Call(PromptSetControlAction, prompt, InteractControlHash);
+                // Keep the E action in the normal input order so the game renders its
+                // keyboard/controller glyph consistently with other focus prompts.
+                Function.Call(PromptSetOrderingAsInputType, prompt, InteractControlHash);
                 Function.Call(PromptSetText, prompt,
                     MISC.VAR_STRING(10, "LITERAL_STRING", "Jugar al truco"));
                 Function.Call(PromptSetPriority, prompt, 2);
@@ -528,6 +547,9 @@ namespace TrucoRDR2
                         "RDR2 no devolvió un grupo de interacción válido para el NPC.");
 
                 Function.Call(PromptSetGroup, _interactionPrompt, _interactionPromptGroup, 0);
+                if (!Function.Call<bool>(PromptIsValid, _interactionPrompt))
+                    throw new InvalidOperationException(
+                        "RDR2 rechazó el prompt Jugar al truco después de registrarlo.");
 
                 SetPromptEnabled(false);
             }
@@ -756,6 +778,8 @@ namespace TrucoRDR2
 
             prop.IsMissionEntity = true;
             ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY(prop.Handle, true);
+            // Keep the tabletop and both chairs at their authored world transforms.
+            ENTITY.FREEZE_ENTITY_POSITION(prop.Handle, true);
             return prop;
         }
 
