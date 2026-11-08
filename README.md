@@ -132,15 +132,16 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 La primera ubicación está fijada al salón de Valentine. El mod detecta al jugador cerca del punto de interacción, muestra un subtítulo y permite iniciar con `E`.
 
 - Al iniciar se guarda la posición y orientación originales del jugador.
-- El mod crea una mesa (`p_table01x`) y dos sillas (`p_chair02x`). Intenta apoyar los objetos con `World.CreateProp(..., placeOnGround: true)` y `ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY`.
-- La orientación visual de las sillas se configura separada de la orientación de los personajes, porque la malla de una silla y la dirección de la animación de sentado no siempre comparten el mismo heading.
-- El jugador ya no se teletransporta a las coordenadas de asiento. El jugador y el rival reciben una tarea de navegación (`Task.GoTo`) hacia posiciones de aproximación; al llegar o alcanzar el tiempo máximo, el script inicia los escenarios de sentado con la opción de teletransporte desactivada.
-- Las posiciones de los personajes usan la altura real del jugador al iniciar la interacción, no la coordenada Z del origen de los objetos. Esto evita colocar los pies al nivel del pivote de una silla o mesa.
+- El mod crea una mesa (`p_table01x`) y dos sillas (`p_chair02x`) y apoya los objetos en el suelo.
+- El jugador camina hasta la silla y el rival también navega desde un punto cercano; ninguno se teletransporta desde su posición inicial.
+- El punto final de sentado se calcula como un desplazamiento local de cada silla (`GetOffsetPosition`): unos centímetros delante del respaldo y aproximadamente 0,50 m por encima del origen del modelo. El punto de aproximación queda más atrás, para que el personaje camine y llegue antes de sentarse.
+- El jugador usa el escenario específico `PROP_HUMAN_SEAT_CHAIR_MP_PLAYER`; el rival usa `PROP_HUMAN_SEAT_CHAIR`. Ambos escenarios se inician como escenarios de sentado y con el ajuste final al punto habilitado, después de que los personajes hayan caminado hasta las sillas. Esto permite una pequeña alineación final con el asiento; no es un teletransporte desde el lugar donde estaban al pulsar `E`.
+- Las orientaciones de las mallas de las sillas son independientes de las orientaciones finales de los personajes.
 - Si falla la creación de un objeto o el inicio de las tareas, se cancela la preparación y se limpian los elementos temporales.
 - Al cerrar con `Esc`, cancelar la preparación o descargar el script, se limpian las tareas, se elimina el rival temporal y se borran los tres objetos; el jugador se restaura si sigue vivo, fuera de combate y cerca de la mesa.
 - `Ctrl+F9` sigue disponible como acceso directo de desarrollo para abrir la interfaz directamente sin desplazarse al salón y sin crear muebles.
 
-El punto de referencia aproximado del salón es `(-307.715, 802.857, 118.979)`. La altura de la superficie y los desplazamientos de la mesa y las sillas necesitan una prueba real dentro del juego. Importante: un objeto de silla creado por script no necesariamente incorpora un punto de escenario de asiento como los puntos colocados por los diseñadores del juego. El controlador hace que los personajes caminen hasta la posición y pide al motor que reproduzca el escenario sin teletransporte, pero la alineación final debe verificarse en RDR2.
+El punto de referencia aproximado del salón es `(-307.715, 802.857, 118.979)`. El desplazamiento local de sentado (`y = -0,05`, `z = 0,50`) es una calibración inicial para el modelo `p_chair02x` y debe probarse visualmente. Los escenarios de silla están documentados en la lista de escenarios de RDR2; los nombres por sí solos no garantizan que el modelo creado por script tenga el mismo punto de asiento que una silla colocada por el juego.
 
 ### Rival controlado por IA
 
