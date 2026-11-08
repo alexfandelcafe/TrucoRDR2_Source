@@ -31,7 +31,6 @@ No se incluye ni redistribuye `ScriptHookRDRNetAPI.dll`; el proyecto debe refere
    TextureDictionary=trucor2_cards
    ```
 
-   La combinación para abrir la mesa se configura en la sección `[Controls]` del mismo archivo INI; el valor predeterminado es `Control+F9`.
 
 3. Las caras de las 40 cartas deben tener estos nombres de textura, sin `.png`: `01-bastos`, `01-copas`, `01-espadas`, `01-oros`, etc. El catálogo usa rangos `01`–`07` y `10`–`12` y omite 8 y 9, que no se usan en el truco argentino. Además, incluí la textura `reverso` (sin extensión), que el mod usa para el dorso de las cartas ocultas del rival.
 
@@ -137,7 +136,7 @@ Además de la interfaz, ahora se crean objetos 3D en el mundo: el mazo `p_cardss
 - Al terminar una mano, `Enter` reparte la siguiente.
 - Al terminar la partida, `Enter` vuelve al menú; desde ahí podés iniciar otra.
 - `Esc` cierra la mesa y restaura la posición del jugador; la mesa, las sillas y el rival permanecen en el salón hasta que se descarga el script.
-- En el salón de Valentine, el prompt contextual del rival muestra la acción `E` para iniciar. `Ctrl+F9` sigue disponible como atajo de desarrollo; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
+- En el salón de Valentine, el prompt contextual del rival muestra la acción `E` para iniciar.
 
 ### Interacción con el mundo (escena persistente de Valentine)
 
@@ -151,7 +150,6 @@ La escena del salón de Valentine se prepara al inicializar el script, no al pul
 - El prompt no se ofrece si el jugador está muerto, montado o en combate. También se oculta si el rival muere, huye, está asustado o intimidado, ebrio, entra en combate, recibe daño, se cae, queda aturdido, está en ragdoll, arde, está siendo arrestado, lassoed/hogtied, se levanta o deja de ejecutar/sale del escenario.
 - Si el rival entra en uno de esos estados durante una partida, la mesa se cierra y se restaura la posición original del jugador cuando es seguro hacerlo. No se crea un rival sustituto automáticamente.
 - Al cerrar con Esc, la partida termina pero los muebles y el rival permanecen en el mundo. Al descargar/abortar el script se eliminan el prompt, los objetos y el rival.
-- Ctrl+F9 sigue disponible como atajo de desarrollo para abrir la interfaz sin usar el prompt del NPC.
 
 El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). Las sillas quedan aproximadamente a 1,0 m a cada lado del centro de la mesa; el punto de sentado se calcula con `GetOffsetPosition` usando y = -0,05 y z = 0,50. El usuario confirmó visualmente que la mesa, las sillas y el escenario de sentado actuales funcionan correctamente; la secuencia de reparto y las animaciones secundarias nuevas requieren prueba dentro del juego.
 
@@ -176,7 +174,6 @@ La distribución usa un diseño de referencia 1920×1080 y se adapta con letterb
 
 - La mesa desactiva los grupos de controles de jugador, cámara y frontend mientras está abierta para evitar acciones del personaje desde detrás de la interfaz.
 - La partida no congela el mundo. Al pulsar Escape se cierra la mesa, se descarta la partida y se vuelve al menú en la próxima interacción; no se conserva la mano ni el tanteador. El jugador recupera su posición original. El rival permanece sentado en el mismo escenario y solo se limpia su tarea secundaria de animación.
-- La combinación de apertura se lee al cargar el script desde la sección [Controls] de TrucoRDR2.ini; los cambios requieren volver a cargar/reiniciar el script.
 - La escala y las posiciones están basadas en un marco de 1920×1080 que se adapta con letterboxing a proporciones distintas. Se pueden retocar durante la prueba en el juego.
 
 ## Nota sobre validación
