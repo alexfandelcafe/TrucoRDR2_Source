@@ -241,12 +241,15 @@ namespace TrucoRDR2
         /// Plays the poker deal clip on the seated ped using AF_SECONDARY so the
         /// GENERIC_SEAT_CHAIR_TABLE_SCENARIO remains the primary task.
         /// </summary>
-        /// <summary>Plays one RDR2 poker deal gesture on the current dealer.</summary>
-        public void PlayCardDealAnimation(bool playerDeals)
+        /// <summary>
+        /// Plays the appropriate deal gesture on the dealer, regardless of whether
+        /// the dealer is the player or the NPC. 1to4 gives to the other seat;
+        /// 2to1 deals to the dealer's own hand.
+        /// </summary>
+        public void PlayCardDealAnimation(bool playerDeals, bool dealingToOther)
         {
             Ped ped = playerDeals ? Game.Player.Character : _opponent;
-            // The tested reverse-direction clip is 2to1; 4to1 does not play for this seated rival.
-            string clip = playerDeals ? "1to4" : "2to1";
+            string clip = dealingToOther ? "1to4" : "2to1";
             QueuePedAnimation(ped, DealAnimationDictionary, clip, 450, DealAnimationFlags);
         }
 
