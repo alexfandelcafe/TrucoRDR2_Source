@@ -43,8 +43,8 @@ namespace TrucoRDR2
         private const double SeatPreparationSeconds = 2.0;
         private const double PromptIntervalSeconds = 2.5;
 
-        private readonly uint _playerSeatScenario = Game.Joaat("PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE");
-        private readonly uint _genericSeatScenario = Game.Joaat("GENERIC_SEAT_CHAIR_TABLE_SCENARIO");
+        private readonly uint _playerSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR_MP_PLAYER");
+        private readonly uint _genericSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
 
         private Vector3 _playerSeatPosition;
         private Vector3 _opponentSeatPosition;
@@ -160,15 +160,10 @@ namespace TrucoRDR2
                 _originalPlayerHeading = player.Heading;
                 _hasOriginalPlayerTransform = true;
 
-                // Use the player's actual current floor height for ped navigation and scenario
-                // coordinates. Do not copy Z from a chair prop: object origins are not seat heights.
+                // Use the world floor at the interaction point for furniture, then derive
+                // each seat anchor from the actual spawned chair transform. The chair model
+                // origin is at floor level; the scenario anchor sits above it at seat height.
                 float floorZ = playerPosition.Z;
-                _playerSeatPosition = new Vector3(PlayerSeat.X, PlayerSeat.Y, floorZ);
-                _opponentSeatPosition = new Vector3(OpponentSeat.X, OpponentSeat.Y, floorZ);
-                _playerApproachPosition = new Vector3(PlayerSeat.X - 0.65f, PlayerSeat.Y, floorZ);
-                _opponentApproachPosition = new Vector3(OpponentSeat.X + 0.65f, OpponentSeat.Y, floorZ);
-                _opponentSpawnPosition = new Vector3(OpponentSeat.X + 1.45f, OpponentSeat.Y + 0.25f, floorZ);
-
                 Vector3 tableSpawn = new Vector3(TablePosition.X, TablePosition.Y, floorZ);
                 Vector3 playerChairSpawn = new Vector3(PlayerSeat.X, PlayerSeat.Y, floorZ);
                 Vector3 opponentChairSpawn = new Vector3(OpponentSeat.X, OpponentSeat.Y, floorZ);
@@ -178,6 +173,14 @@ namespace TrucoRDR2
                 _tableProp = CreateFurnitureProp(TableModelName, tableSpawn, TableHeading);
                 _playerChairProp = CreateFurnitureProp(ChairModelName, playerChairSpawn, PlayerChairHeading);
                 _opponentChairProp = CreateFurnitureProp(ChairModelName, opponentChairSpawn, OpponentChairHeading);
+
+                // A chair's scenario point is not its mesh origin. Use a local position
+                // near the seat surface, transformed by the chair's own rotation.
+                _playerSeatPosition = _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
+                _opponentSeatPosition = _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
+                _playerApproachPosition = _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.85f, 0.0f));
+                _opponentApproachPosition = _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.85f, 0.0f));
+                _opponentSpawnPosition = new Vector3(OpponentSeat.X + 1.45f, OpponentSeat.Y + 0.25f, floorZ);
 
                 // Spawn the rival nearby and let navigation move him to the approach point.
                 _opponent = World.CreatePed(
@@ -238,9 +241,9 @@ namespace TrucoRDR2
             _opponent.Heading = OpponentHeading;
 
             player.Task.StartScenario(
-                _playerSeatScenario, _playerSeatPosition, -1, false, true);
+                _playerSeatScenario, _playerSeatPosition, -1, true, true);
             _opponent.Task.StartScenario(
-                _genericSeatScenario, _opponentSeatPosition, -1, false, true);
+                _genericSeatScenario, _opponentSeatPosition, -1, true, true);
         }
 
         private bool AreBothCharactersNearApproach()
