@@ -204,8 +204,8 @@ namespace TrucoRDR2
                 if (_opponentChairProp == null || !_opponentChairProp.Exists())
                     _opponentChairProp = CreateFurnitureProp(ChairModelName, OpponentSeat, OpponentChairHeading);
 
-                // Keep the previously aligned seat-height offset, but move the chairs
-                // beyond the table footprint so ground placement cannot put them on top.
+                // Keep the previously confirmed seat-height offset. Because chairs are not
+                // passed through ground-placement, their floor-level world origins stay fixed.
                 _playerSeatPosition =
                     _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
                 _opponentSeatPosition =
@@ -215,10 +215,9 @@ namespace TrucoRDR2
                 // not replaced, so the interaction stays unavailable after that event.
                 if (!_opponentSpawnAttempted)
                 {
-                    Vector3 spawnPosition = new Vector3(
-                        OpponentSeat.X + 1.45f,
-                        OpponentSeat.Y + 0.25f,
-                        LocationCenter.Z);
+                    // Spawn the rival at the final seat coordinate from the first frame;
+                    // do not create it off to the side and depend on scenario teleport to move it.
+                    Vector3 spawnPosition = _opponentSeatPosition;
 
                     _opponent = World.CreatePed(
                         PedHash.a_m_m_valtownfolk_01, spawnPosition, OpponentHeading);
@@ -701,6 +700,12 @@ namespace TrucoRDR2
                 float y = Math.Max(0.0f, point.Y - 26.0f);
 
                 try { GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(3); } catch { }
+                GRAPHICS.DRAW_RECT(
+                    (x + estimatedWidth * 0.5f) / screenWidth,
+                    (y + 11.0f) / screenHeight,
+                    (estimatedWidth + 24.0f) / screenWidth,
+                    34.0f / screenHeight,
+                    14, 11, 8, 190, false, false);
                 UIDEBUG._BG_SET_TEXT_SCALE(scale, scale);
                 UIDEBUG._BG_SET_TEXT_COLOR(255, 226, 170, 255);
                 string rendered = MISC.VAR_STRING(10, "LITERAL_STRING", caption);
