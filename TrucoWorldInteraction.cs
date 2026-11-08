@@ -236,7 +236,7 @@ namespace TrucoRDR2
 
             try
             {
-                Function.Call(RequestAnimationDictionary, DealAnimationDictionary);
+                STREAMING.REQUEST_ANIM_DICT(DealAnimationDictionary);
                 if (!STREAMING.HAS_ANIM_DICT_LOADED(DealAnimationDictionary))
                     return;
 
