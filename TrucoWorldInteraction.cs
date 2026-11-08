@@ -384,6 +384,13 @@ namespace TrucoRDR2
                 int playerHandle = player != null && player.Exists() ? player.Handle : 0;
 
                 if (_opponent.IsDeadOrDying ||
+                    _opponent.IsInCombat ||
+                    _opponent.IsCowering ||
+                    _opponent.IsRespondingToThreat ||
+                    _opponent.IsIncapacitated ||
+                    _opponent.IsWrithing ||
+                    _opponent.IsBeingArrested ||
+                    _opponent.IsLassoed ||
                     Function.Call<bool>(IsEntityDead, ped) ||
                     Function.Call<bool>(IsEntityOnFire, ped) ||
                     Function.Call<bool>(IsPedInjured, ped) ||
