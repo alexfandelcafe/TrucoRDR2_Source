@@ -91,9 +91,18 @@ namespace TrucoRDR2
 
                         if (walkTimedOut || (bothAtApproach && minimumWalkElapsed))
                         {
-                            BeginSittingScenarios();
-                            _walkingToSeats = false;
-                            _preparationStartedUtc = DateTime.UtcNow;
+                            try
+                            {
+                                BeginSittingScenarios();
+                                _walkingToSeats = false;
+                                _preparationStartedUtc = DateTime.UtcNow;
+                            }
+                            catch (Exception ex)
+                            {
+                                LastError = ex.Message;
+                                EndSession();
+                                Screen.PrintSubtitle("No se pudieron iniciar las animaciones de sentado. Revisa scripts\\TrucoRDR2.log.");
+                            }
                         }
 
                         return false;
