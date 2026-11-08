@@ -81,7 +81,6 @@ namespace TrucoRDR2
         private bool _initialDealPending;
         private bool _initialDealSequenceStarted;
         private int _initialDealLastTriggeredIndex = -1;
-        private DateTime _initialDealWaitStartedUtc;
         private const int InitialDealCardCount = 6;
         private const double InitialDealCardIntervalSeconds = 0.62;
         private const double InitialDealCardFlightSeconds = 0.48;
@@ -240,7 +239,6 @@ namespace TrucoRDR2
             _initialDealPending = true;
             _initialDealSequenceStarted = false;
             _initialDealLastTriggeredIndex = -1;
-            _initialDealWaitStartedUtc = DateTime.UtcNow;
             _dealAnimationStartUtc = DateTime.MinValue;
             _dealAnimationActive = true;
             _nextComputerActionUtc = DateTime.MaxValue;
