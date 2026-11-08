@@ -46,6 +46,7 @@ namespace TrucoRDR2
         private readonly TextElement _instructions;
         private readonly TextElement _status;
         private readonly TrucoTablePreview _tablePreview;
+        private readonly TrucoWorldInteraction _worldInteraction;
         private readonly string _diagnosticLogPath;
 
         private bool _previewEnabled;
@@ -69,6 +70,7 @@ namespace TrucoRDR2
                 ReadMatchTargetSetting(),
                 ReadFlorEnabledSetting(),
                 ReadSoundEnabledSetting());
+            _worldInteraction = new TrucoWorldInteraction();
 
             string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(scriptDirectory))
@@ -117,6 +119,30 @@ namespace TrucoRDR2
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
+            // During the short seating transition, keep input reserved for this interaction.
+            if (_worldInteraction.IsPreparing)
+            {
+                if (e.KeyCode == Keys.Escape)
+                    _worldInteraction.CancelPreparation();
+
+                e.Handled = true;
+                return;
+            }
+
+            // E is the world interaction only near the one supported Valentine saloon table.
+            // Inside the overlay, E remains the Envido key handled by TrucoTablePreview.
+            if (!_tablePreview.IsVisible && !_previewEnabled &&
+                _worldInteraction.IsNearSaloon && e.KeyCode == Keys.E)
+            {
+                if (_worldInteraction.TryBegin())
+                    WriteDiagnostic("Interacción del salón de Valentine iniciada; preparando los asientos.");
+                else if (!string.IsNullOrEmpty(_worldInteraction.LastError))
+                    WriteDiagnostic("No se pudo iniciar la interacción del salón: " + _worldInteraction.LastError);
+
+                e.Handled = true;
+                return;
+            }
+
             if (e.KeyCode == _tableToggleBinding.Key && e.Modifiers == _tableToggleBinding.Modifiers)
             {
                 // Ignore repeated KeyDown events until the physical key is released.
@@ -219,11 +245,23 @@ namespace TrucoRDR2
 
         private void OnTick(object sender, EventArgs e)
         {
+            bool startLocationMatch = _worldInteraction.Update(_tablePreview.IsVisible);
+            if (startLocationMatch)
+            {
+                _tablePreview.Start();
+                WriteDiagnostic("Mesa de Valentine abierta tras preparar los asientos.");
+            }
+
             if (_tablePreview.IsVisible)
             {
                 _tablePreview.Draw();
                 return;
             }
+
+            // While seating, controls are suppressed by TrucoWorldInteraction and the
+            // texture viewer must not draw over that transition.
+            if (_worldInteraction.IsPreparing || _worldInteraction.IsSessionActive)
+                return;
 
             if (!_previewEnabled)
                 return;
@@ -510,9 +548,10 @@ namespace TrucoRDR2
         private void OnAborted(object sender, EventArgs e)
         {
             _tablePreview.Close();
+            _worldInteraction.Dispose();
             _previewEnabled = false;
             DisposeSprites();
-            WriteDiagnostic("Script abortado; sprites liberados.");
+            WriteDiagnostic("Script abortado; mesa, rival temporal y sprites liberados.");
         }
 
         private void WriteExpectedYtdPath(string scriptDirectory)
