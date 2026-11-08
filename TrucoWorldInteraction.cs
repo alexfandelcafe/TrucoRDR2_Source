@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Reflection;
 using RDR2;
 using RDR2.Math;
@@ -17,13 +18,12 @@ namespace TrucoRDR2
         private static readonly Vector3 LocationCenter =
             new Vector3(-307.7149f, 802.8571f, 118.9794f);
         private static readonly Vector3 TablePosition = LocationCenter;
-        // Keep both chairs outside the tabletop collision footprint. When a chair is
-        // spawned too close to the table, PLACE_ENTITY_ON_GROUND_PROPERLY can settle it
-        // on the tabletop instead of the saloon floor.
+        // Place chairs at their original, closer positions. Chairs are kept at the known
+        // interior floor Z directly; grounding them can snap them onto the tabletop collision.
         private static readonly Vector3 PlayerSeat =
-            new Vector3(-309.65f, 802.8571f, 118.9794f);
+            new Vector3(-309.05f, 802.8571f, 118.9794f);
         private static readonly Vector3 OpponentSeat =
-            new Vector3(-305.78f, 802.8571f, 118.9794f);
+            new Vector3(-306.38f, 802.8571f, 118.9794f);
 
         private const string TableModelName = "p_table01x";
         private const string ChairModelName = "p_chair02x";
@@ -142,9 +142,10 @@ namespace TrucoRDR2
                 return false;
             }
 
-            // The NPC's entity-focus group is activated by RDR2 itself when the player
-            // points at this ped. Do not force a global active group: that can hide the prompt.
+            // Keep the native prompt enabled, and draw an explicit fallback label over the
+            // NPC: some RDR2 builds accept its E input but don't render custom focus prompts.
             SetPromptEnabled(true);
+            DrawWorldInteractionPrompt();
 
             if (IsPromptActive() && IsPromptJustPressed())
                 return TryBegin(player);
@@ -673,6 +674,44 @@ namespace TrucoRDR2
             }
         }
 
+        private void DrawWorldInteractionPrompt()
+        {
+            try
+            {
+                if (_opponent == null || !_opponent.Exists())
+                    return;
+
+                // Keep the fallback label anchored to the NPC's head and only draw it
+                // while the player is within the same range that enables interaction.
+                Vector3 anchor = _opponent.Position + new Vector3(0.0f, 0.0f, 1.35f);
+                PointF point = RDR2.UI.Screen.WorldToScreen(anchor);
+                if (point == PointF.Empty)
+                    return;
+
+                const string caption = "E  JUGAR AL TRUCO";
+                const float scale = 0.40f;
+                float estimatedWidth = caption.Length * 0.52f * scale * 70.0f;
+                float screenWidth = RDR2.UI.Screen.Width;
+                float screenHeight = RDR2.UI.Screen.Height;
+                if (screenWidth <= 0.0f || screenHeight <= 0.0f)
+                    return;
+
+                float x = Math.Max(0.0f, Math.Min(screenWidth - estimatedWidth,
+                    point.X - estimatedWidth * 0.5f));
+                float y = Math.Max(0.0f, point.Y - 26.0f);
+
+                try { GRAPHICS.SET_SCRIPT_GFX_DRAW_ORDER(3); } catch { }
+                UIDEBUG._BG_SET_TEXT_SCALE(scale, scale);
+                UIDEBUG._BG_SET_TEXT_COLOR(255, 226, 170, 255);
+                string rendered = MISC.VAR_STRING(10, "LITERAL_STRING", caption);
+                UIDEBUG._BG_DISPLAY_TEXT(rendered, x / screenWidth, y / screenHeight);
+            }
+            catch
+            {
+                // UI fallback must never prevent the native prompt's input from working.
+            }
+        }
+
         private bool IsPromptActive()
         {
             try
@@ -779,7 +818,10 @@ namespace TrucoRDR2
                     "No se pudo crear el objeto '" + modelName + "'. Comprueba el modelo y la ubicación.");
 
             prop.IsMissionEntity = true;
-            ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY(prop.Handle, true);
+            // The table is placed on the floor. Chairs use the fixed interior floor Z instead
+            // of the ground-placement native, which can detect the table top as their support.
+            if (!string.Equals(modelName, ChairModelName, StringComparison.OrdinalIgnoreCase))
+                ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY(prop.Handle, true);
             // Keep the tabletop and both chairs at their authored world transforms.
             ENTITY.FREEZE_ENTITY_POSITION(prop.Handle, true);
             return prop;
