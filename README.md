@@ -132,7 +132,9 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 La primera ubicación está fijada al salón de Valentine. El mod detecta al jugador cerca del punto de interacción, muestra un subtítulo y permite iniciar con `E`.
 
 - Al iniciar se guarda la posición y orientación originales del jugador.
-- Antes de sentar a los personajes, el script crea tres objetos físicos del juego: una mesa de madera (`p_table01x`) y dos sillas (`p_chair02x`), orientadas frente a frente.
+- Antes de sentar a los personajes, el script crea tres objetos físicos del juego: una mesa de madera (`p_table01x`) y dos sillas (`p_chair02x`), orientadas frente a frente. Tras crear cada objeto, invoca `ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY` para asentarlo en el piso.
+- Las coordenadas Z utilizadas por los escenarios de sentado se toman de las sillas después de aplicar el ajuste al suelo; así los personajes no dependen de una altura fija previa al ajuste.
+- Las orientaciones de sentado se invirtieron respecto de la primera prueba para corregir la rotación opuesta del jugador y del rival.
 - Solo si los tres objetos se crearon correctamente, se crea el rival temporal y se inician los escenarios `PROP_PLAYER_DYNAMIC_SEAT_CHAIR_TABLE` y `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`. Si falla la creación de un objeto, se cancela la preparación para evitar repetir la animación sin muebles.
 - Hay una breve transición durante la que los controles quedan bloqueados; después se abre la mesa de truco existente.
 - Al cerrar con `Esc`, cancelar la preparación o descargar el script, se limpian las tareas, se elimina el rival temporal, se borran los tres objetos creados y se restaura al jugador si sigue vivo, fuera de combate y cerca de la mesa.
