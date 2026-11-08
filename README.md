@@ -117,9 +117,11 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 
 ### Animaciones de cartas
 
-Al jugar una carta, la interfaz anima la textura personalizada desde la mano hacia la baza y el personaje correspondiente reproduce el clip de reparto de póker del juego (mini_games@poker_mg@deal). El jugador usa el clip 1to4 para repartir hacia el asiento opuesto; el rival usa 4to1 en sentido inverso. La animación se ejecuta con AF_SECONDARY para conservar como tarea principal el escenario GENERIC_SEAT_CHAIR_TABLE_SCENARIO. Si el diccionario no llega a cargarse, se omite la animación corporal sin interrumpir la mano.
+Al aceptar el prompt contextual `Jugar al truco`, la partida mano a mano comienza directamente y se inicia el reparto inicial de seis cartas, alternando entre mano y repartidor. Durante unos 3,6 segundos se muestran únicamente la mesa y las cartas que van llegando a cada mano; el marcador, las instrucciones y los controles de la partida aparecen cuando termina el sexto movimiento. El reparto espera a que el YTD `trucor2_cards` esté cargado; si falta, se informa en pantalla en lugar de mostrar cartas invisibles.
 
-Las cartas con las caras españolas siguen siendo las texturas del YTD personalizado en la interfaz; no se sustituyen por modelos físicos de cartas del póker base, porque esos modelos no usan automáticamente las texturas españolas del mod.
+Cada carta se anima desde el centro de la mesa hasta su posición: las tres cartas propias muestran su cara española y las tres del rival muestran `reverso`. En las tres entregas hacia el asiento opuesto, el repartidor reproduce el clip correspondiente del diccionario `mini_games@poker_mg@deal`: `1to4` cuando reparte el jugador y `4to1` cuando reparte el rival. Se usa el wrapper `Ped.Task.PlayAnimation` de ScriptHookRDR2DotNet con las banderas RDR2 `Looping | Upperbody | Secondary` (valor combinado 25; `Secondary` vale 16 en esta API), para conservar como tarea principal `GENERIC_SEAT_CHAIR_TABLE_SCENARIO`. Una vez repartidas, la mano queda lista y las animaciones de cartas jugadas siguen siendo movimientos de las texturas de la interfaz.
+
+Las caras españolas y los dorsos siguen siendo texturas del YTD personalizado. No se crean cartas físicas 3D: los modelos de cartas del póker base no adoptan automáticamente las texturas españolas del mod.
 
 ### Desarrollo de la partida
 
