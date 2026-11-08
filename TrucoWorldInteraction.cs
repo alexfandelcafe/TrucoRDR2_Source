@@ -7,10 +7,9 @@ using RDR2.UI;
 namespace TrucoRDR2
 {
     /// <summary>
-    /// One fixed world interaction in the Valentine saloon.
-    /// Spawns a table and two chairs, then walks both characters to the seats before
-    /// asking the game to run the sitting scenarios. The player is never teleported
-    /// to the seat position.
+    /// Persistent truco table in the Valentine saloon.
+    /// The furniture and seated rival are created when the script starts.
+    /// The player joins directly through the rival's contextual E prompt.
     /// </summary>
     internal sealed class TrucoWorldInteraction
     {
@@ -22,243 +21,386 @@ namespace TrucoRDR2
         private static readonly Vector3 OpponentSeat =
             new Vector3(-306.38f, 802.8571f, 118.9794f);
 
-        // Furniture orientations are intentionally independent from character headings.
-        // These are reversed relative to the previous build because the chair meshes
-        // were facing away from the table even though the opponent's pose was correct.
         private const string TableModelName = "p_table01x";
         private const string ChairModelName = "p_chair02x";
         private const float TableHeading = 90.0f;
         private const float PlayerChairHeading = 90.0f;
         private const float OpponentChairHeading = 270.0f;
-
-        // Keep character headings that were reported to look correct.
         private const float PlayerHeading = 270.0f;
         private const float OpponentHeading = 90.0f;
 
         private const float InteractionRadius = 3.2f;
-        private const float WalkSpeed = 1.0f;
-        private const float ApproachDistance = 0.85f;
-        private const double MinimumWalkSeconds = 0.8;
-        private const double WalkTimeoutSeconds = 7.0;
-        private const double SeatPreparationSeconds = 2.0;
-        private const double PromptIntervalSeconds = 2.5;
+        private const float PromptRadius = 2.8f;
+        private const double SetupRetrySeconds = 3.0;
+        private const double ScenarioWarmupSeconds = 1.5;
 
-        private readonly uint _playerSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
-        private readonly uint _opponentSeatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
+        private const ulong PromptRegisterBegin = 0x04F97DE45A519419;
+        private const ulong PromptRegisterEnd = 0xF7AA2696A22AD8B9;
+        private const ulong PromptSetControlAction = 0xB5352B7494A08258;
+        private const ulong PromptSetText = 0x5DD02A8318420DD7;
+        private const ulong PromptSetPriority = 0xCA24F528D0D16289;
+        private const ulong PromptSetStandardMode = 0xCC6656799977741B;
+        private const ulong PromptSetAttribute = 0x560E76D5E2E1803F;
+        private const ulong PromptSetVisible = 0x71215ACCFDE075EE;
+        private const ulong PromptSetEnabled = 0x8A0FB4D03A630D21;
+        private const ulong PromptSetGroup = 0x2F11D3A254169EA4;
+        private const ulong PromptSetActiveGroupThisFrame = 0xC65A45D4453C2627;
+        private const ulong PromptGetGroupIdForTargetEntity = 0xB796970BD125FCE8;
+        private const ulong PromptContextSetPoint = 0xAE84C5EE2C384FB3;
+        private const ulong PromptContextSetRadius = 0x0C718001B77CA468;
+        private const ulong PromptIsValid = 0x347469FBDD1589A9;
+        private const ulong PromptIsActive = 0x546E342E01DE71CF;
+        private const ulong PromptIsJustPressed = 0x2787CC611D3FACC5;
+        private const ulong PromptDelete = 0x00EDE88D4D13CF59;
+
+        private const ulong IsEntityDead = 0x7D5B1F88E7504BBA;
+        private const ulong IsEntityOnFire = 0x1BD7C371CE257C3E;
+        private const ulong IsPedInjured = 0x84A2DD9AC37C35C1;
+        private const ulong IsPedDeadOrDying = 0x3317DEDB88C95038;
+        private const ulong IsPedShooting = 0x34616828CD07F1A1;
+        private const ulong IsPedFalling = 0xFB92A102F1C4DFA3;
+        private const ulong IsPedBeingStunned = 0x4FBACCE3B4138EE8;
+        private const ulong IsPedFleeing = 0xBBCCE00B381F8482;
+        private const ulong IsPedRagdoll = 0x47E4E977581C5B55;
+        private const ulong IsPedHogtied = 0x3AA24CCC0D451379;
+        private const ulong IsPedFallingOver = 0x3E592D0486DEC0F6;
+        private const ulong IsPedGettingUp = 0x2A74E1D5F2F00EEC;
+        private const ulong IsPedUsingAnyScenario = 0x57AB4A3080F85143;
+
+        private readonly uint _seatScenario = Game.Joaat("PROP_HUMAN_SEAT_CHAIR");
 
         private Vector3 _playerSeatPosition;
         private Vector3 _opponentSeatPosition;
-        private Vector3 _playerApproachPosition;
-        private Vector3 _opponentApproachPosition;
-        private Vector3 _opponentSpawnPosition;
         private Prop _tableProp;
         private Prop _playerChairProp;
         private Prop _opponentChairProp;
         private Ped _opponent;
+
+        private int _interactionPrompt;
+        private int _interactionPromptGroup;
+        private bool _opponentSpawnAttempted;
+        private bool _opponentScenarioStarted;
+        private bool _worldSetupComplete;
+        private bool _sessionActive;
+        private bool _hasOriginalPlayerTransform;
         private Vector3 _originalPlayerPosition;
         private float _originalPlayerHeading;
-        private bool _hasOriginalPlayerTransform;
-        private bool _sessionActive;
-        private bool _preparing;
-        private bool _walkingToSeats;
-        private DateTime _preparationStartedUtc;
-        private DateTime _nextPromptUtc;
+        private DateTime _opponentScenarioStartedUtc;
+        private DateTime _nextSetupAttemptUtc;
 
-        public bool IsNearSaloon { get; private set; }
-        public bool IsPreparing { get { return _preparing; } }
         public bool IsSessionActive { get { return _sessionActive; } }
+        public bool SessionWasInterrupted { get; private set; }
         public string LastError { get; private set; }
 
         /// <summary>
-        /// Returns true when the characters have had time to approach and sit,
-        /// indicating that the existing truco UI may be opened.
+        /// Returns true on the frame the contextual prompt starts a new game.
         /// </summary>
         public bool Update(bool tableVisible)
         {
+            SessionWasInterrupted = false;
+            EnsureWorldSetup();
+
             if (_sessionActive)
             {
-                if (_preparing)
+                if (tableVisible && !IsOpponentAvailable())
                 {
-                    DisableControlsDuringPreparation();
-
-                    if (_walkingToSeats)
-                    {
-                        bool walkTimedOut =
-                            (DateTime.UtcNow - _preparationStartedUtc).TotalSeconds >= WalkTimeoutSeconds;
-                        bool bothAtApproach = AreBothCharactersNearApproach();
-                        bool minimumWalkElapsed =
-                            (DateTime.UtcNow - _preparationStartedUtc).TotalSeconds >= MinimumWalkSeconds;
-
-                        if (walkTimedOut || (bothAtApproach && minimumWalkElapsed))
-                        {
-                            try
-                            {
-                                BeginSittingScenarios();
-                                _walkingToSeats = false;
-                                _preparationStartedUtc = DateTime.UtcNow;
-                            }
-                            catch (Exception ex)
-                            {
-                                LastError = ex.Message;
-                                EndSession();
-                                Screen.PrintSubtitle("No se pudieron iniciar las animaciones de sentado. Revisa scripts\\TrucoRDR2.log.");
-                            }
-                        }
-
-                        return false;
-                    }
-
-                    if ((DateTime.UtcNow - _preparationStartedUtc).TotalSeconds >= SeatPreparationSeconds)
-                    {
-                        _preparing = false;
-                        return true;
-                    }
-
+                    SessionWasInterrupted = true;
+                    EndSession();
                     return false;
                 }
 
                 if (!tableVisible)
                     EndSession();
 
-                IsNearSaloon = false;
                 return false;
             }
 
-            if (tableVisible)
+            if (tableVisible || !_worldSetupComplete)
             {
-                IsNearSaloon = false;
+                SetPromptEnabled(false);
                 return false;
             }
 
-            UpdateProximityPrompt();
+            Ped player = Game.Player.Character;
+            if (!CanPlayerInteract(player) || !IsOpponentAvailable())
+            {
+                SetPromptEnabled(false);
+                return false;
+            }
+
+            UpdatePromptAnchor();
+            SetPromptEnabled(true);
+            ActivateExclusivePromptGroup();
+
+            if (IsPromptActive() && IsPromptJustPressed())
+                return TryBegin(player);
+
             return false;
         }
 
-        public bool TryBegin()
+        public void Dispose()
         {
-            LastError = null;
-            if (_sessionActive || _preparing)
-                return false;
+            EndSession();
+            SetPromptEnabled(false);
+            DeletePrompt();
 
-            Ped player = Game.Player.Character;
-            if (player == null || !player.Exists() || player.IsDeadOrDying)
-                return false;
-
-            Vector3 playerPosition = player.Position;
-            if (!IsInsideInteractionRange(playerPosition))
-                return false;
-
-            if (player.IsOnMount || player.IsInCombat)
-            {
-                Screen.PrintSubtitle("Bajate del caballo y alejate del combate para jugar al truco.");
-                return false;
-            }
+            DeleteProp(ref _playerChairProp);
+            DeleteProp(ref _opponentChairProp);
+            DeleteProp(ref _tableProp);
 
             try
             {
-                _originalPlayerPosition = playerPosition;
+                if (_opponent != null && _opponent.Exists())
+                {
+                    _opponent.Task.ClearTasks(true);
+                    _opponent.Delete();
+                }
+            }
+            catch
+            {
+                // Continue cleanup even if the NPC was already removed by the game.
+            }
+
+            _opponent = null;
+            _worldSetupComplete = false;
+        }
+
+        private void EnsureWorldSetup()
+        {
+            if (_worldSetupComplete || DateTime.UtcNow < _nextSetupAttemptUtc)
+                return;
+
+            _nextSetupAttemptUtc = DateTime.UtcNow.AddSeconds(SetupRetrySeconds);
+
+            try
+            {
+                // Use the fixed interior floor height. Props are then settled against
+                // collision, so setup does not depend on where the player spawned.
+                if (_tableProp == null || !_tableProp.Exists())
+                    _tableProp = CreateFurnitureProp(TableModelName, TablePosition, TableHeading);
+
+                if (_playerChairProp == null || !_playerChairProp.Exists())
+                    _playerChairProp = CreateFurnitureProp(ChairModelName, PlayerSeat, PlayerChairHeading);
+
+                if (_opponentChairProp == null || !_opponentChairProp.Exists())
+                    _opponentChairProp = CreateFurnitureProp(ChairModelName, OpponentSeat, OpponentChairHeading);
+
+                _playerSeatPosition =
+                    _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
+                _opponentSeatPosition =
+                    _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
+
+                // Spawn the rival only once. A dead or removed rival is deliberately
+                // not replaced, so the interaction stays unavailable after that event.
+                if (!_opponentSpawnAttempted)
+                {
+                    Vector3 spawnPosition = new Vector3(
+                        OpponentSeat.X + 1.45f,
+                        OpponentSeat.Y + 0.25f,
+                        LocationCenter.Z);
+
+                    _opponent = World.CreatePed(
+                        PedHash.a_m_m_valtownfolk_01, spawnPosition, OpponentHeading);
+
+                    if (_opponent == null || !_opponent.Exists())
+                        throw new InvalidOperationException(
+                            "No se pudo crear al rival en el salón de Valentine.");
+
+                    _opponentSpawnAttempted = true;
+                    _opponent.BlockPermanentEvents = false;
+                    _opponent.NeverLeavesGroup = false;
+                    _opponent.Heading = OpponentHeading;
+                }
+
+                if (_opponent != null && _opponent.Exists() && !_opponentScenarioStarted)
+                {
+                    // This is the same chair scenario confirmed in-game for both peds.
+                    // Teleport is intentional: the rival is seated as part of world setup.
+                    _opponent.Task.StartScenario(
+                        _seatScenario, _opponentSeatPosition, -1, true, true);
+
+                    _opponentScenarioStarted = true;
+                    _opponentScenarioStartedUtc = DateTime.UtcNow;
+                }
+
+                if (_opponent != null && _opponent.Exists() && _interactionPrompt == 0)
+                    CreateInteractionPrompt();
+
+                _worldSetupComplete =
+                    _tableProp != null && _tableProp.Exists() &&
+                    _playerChairProp != null && _playerChairProp.Exists() &&
+                    _opponentChairProp != null && _opponentChairProp.Exists() &&
+                    _opponent != null && _opponent.Exists() &&
+                    _opponentScenarioStarted &&
+                    _interactionPrompt != 0;
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+            }
+        }
+
+        private void CreateInteractionPrompt()
+        {
+            int prompt = Function.Call<int>(PromptRegisterBegin);
+            if (prompt == 0)
+                throw new InvalidOperationException("No se pudo registrar el prompt contextual del rival.");
+
+            try
+            {
+                // INPUT_CONTEXT_Y is the default E interaction binding on PC.
+                Function.Call(PromptSetControlAction, prompt, Game.Joaat("INPUT_CONTEXT_Y"));
+                Function.Call(PromptSetText, prompt,
+                    MISC.VAR_STRING(10, "LITERAL_STRING", "Jugar al truco"));
+                Function.Call(PromptSetPriority, prompt, 2);
+                Function.Call(PromptSetStandardMode, prompt, true);
+                Function.Call(PromptSetAttribute, prompt, 34, true);
+                Function.Call(PromptRegisterEnd, prompt);
+
+                _interactionPrompt = prompt;
+                _interactionPromptGroup =
+                    Function.Call<int>(PromptGetGroupIdForTargetEntity, _opponent.Handle);
+
+                Function.Call(PromptSetGroup, _interactionPrompt, _interactionPromptGroup, 0);
+                Function.Call(PromptContextSetPoint, _interactionPrompt,
+                    _opponent.Position.X, _opponent.Position.Y, _opponent.Position.Z + 0.55f);
+                Function.Call(PromptContextSetRadius, _interactionPrompt, PromptRadius);
+
+                SetPromptEnabled(false);
+            }
+            catch
+            {
+                try
+                {
+                    Function.Call(PromptDelete, prompt);
+                }
+                catch
+                {
+                    // Preserve the original prompt-registration exception.
+                }
+                _interactionPrompt = 0;
+                _interactionPromptGroup = 0;
+                throw;
+            }
+        }
+
+        private void UpdatePromptAnchor()
+        {
+            try
+            {
+                if (_interactionPrompt == 0 || _opponent == null || !_opponent.Exists())
+                    return;
+
+                Function.Call(PromptContextSetPoint, _interactionPrompt,
+                    _opponent.Position.X, _opponent.Position.Y, _opponent.Position.Z + 0.55f);
+                Function.Call(PromptContextSetRadius, _interactionPrompt, PromptRadius);
+            }
+            catch
+            {
+                // A disappearing entity is handled by IsOpponentAvailable on the next tick.
+            }
+        }
+
+        private void ActivateExclusivePromptGroup()
+        {
+            if (_interactionPromptGroup == 0 || _interactionPrompt == 0)
+                return;
+
+            try
+            {
+                // RDR2 normal prompt groups are exclusive: this keeps this one
+                // contextual action as the active group while the player is beside the rival.
+                Function.Call(PromptSetActiveGroupThisFrame,
+                    unchecked((uint)_interactionPromptGroup),
+                    MISC.VAR_STRING(10, "LITERAL_STRING", "SALÓN DE VALENTINE"),
+                    1, 0, 0, 0);
+            }
+            catch
+            {
+                // The prompt remains gated by its context point and NPC state.
+            }
+        }
+
+        private bool TryBegin(Ped player)
+        {
+            if (_sessionActive || !CanPlayerInteract(player) || !IsOpponentAvailable())
+                return false;
+
+            if (DistanceSquared(player.Position, _opponent.Position) >
+                InteractionRadius * InteractionRadius)
+                return false;
+
+            try
+            {
+                _originalPlayerPosition = player.Position;
                 _originalPlayerHeading = player.Heading;
                 _hasOriginalPlayerTransform = true;
 
-                // Use the world floor at the interaction point for furniture, then derive
-                // each seat anchor from the actual spawned chair transform. The chair model
-                // origin is at floor level; the scenario anchor sits above it at seat height.
-                float floorZ = playerPosition.Z;
-                Vector3 tableSpawn = new Vector3(TablePosition.X, TablePosition.Y, floorZ);
-                Vector3 playerChairSpawn = new Vector3(PlayerSeat.X, PlayerSeat.Y, floorZ);
-                Vector3 opponentChairSpawn = new Vector3(OpponentSeat.X, OpponentSeat.Y, floorZ);
-
-                // Spawn furniture independently from the seating coordinates. The mesh origin
-                // is not a safe height for a character's feet, especially for interior props.
-                _tableProp = CreateFurnitureProp(TableModelName, tableSpawn, TableHeading);
-                _playerChairProp = CreateFurnitureProp(ChairModelName, playerChairSpawn, PlayerChairHeading);
-                _opponentChairProp = CreateFurnitureProp(ChairModelName, opponentChairSpawn, OpponentChairHeading);
-
-                // A chair's scenario point is not its mesh origin. Use a local position
-                // near the seat surface, transformed by the chair's own rotation.
-                _playerSeatPosition = _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
-                _opponentSeatPosition = _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
-                _playerApproachPosition = _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.85f, 0.0f));
-                _opponentApproachPosition = _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.85f, 0.0f));
-                _opponentSpawnPosition = new Vector3(OpponentSeat.X + 1.45f, OpponentSeat.Y + 0.25f, floorZ);
-
-                // Spawn the rival nearby and let navigation move him to the approach point.
-                _opponent = World.CreatePed(
-                    PedHash.a_m_m_valtownfolk_01, _opponentSpawnPosition, OpponentHeading);
-                if (_opponent == null || !_opponent.Exists())
-                    throw new InvalidOperationException("No se pudo crear al rival en el salón de Valentine.");
-
-                _opponent.BlockPermanentEvents = true;
-                _opponent.NeverLeavesGroup = true;
-                _opponent.Heading = OpponentHeading;
-                _opponent.Task.GoTo(_opponentApproachPosition, WalkSpeed, 7000);
-
-                // Do not set player.Position or PositionNoOffset here. Give control to the
-                // navigation task so the player takes actual steps toward the chair.
                 player.Task.ClearTasks(true);
-                player.Task.GoTo(_playerApproachPosition, WalkSpeed, 7000);
+                player.Heading = PlayerHeading;
+
+                // No approach task or walking phase: the player snaps directly into
+                // the same chair scenario used by the seated opponent.
+                player.Task.StartScenario(
+                    _seatScenario, _playerSeatPosition, -1, true, true);
 
                 _sessionActive = true;
-                _preparing = true;
-                _walkingToSeats = true;
-                _preparationStartedUtc = DateTime.UtcNow;
-                IsNearSaloon = false;
-                Screen.PrintSubtitle("Acercándose a los asientos...");
+                SetPromptEnabled(false);
+                LastError = null;
                 return true;
             }
             catch (Exception ex)
             {
                 LastError = ex.Message;
                 EndSession();
-                Screen.PrintSubtitle("No se pudo preparar la mesa de truco. Revisa scripts\\TrucoRDR2.log.");
                 return false;
             }
         }
 
-        public void CancelPreparation()
+        private bool CanPlayerInteract(Ped player)
         {
-            if (!_preparing)
-                return;
+            if (player == null || !player.Exists() || player.IsDeadOrDying ||
+                player.IsOnMount || player.IsInCombat ||
+                _opponent == null || !_opponent.Exists())
+                return false;
 
-            EndSession();
-            Screen.PrintSubtitle("Se canceló la partida de truco.");
+            return DistanceSquared(player.Position, _opponent.Position) <=
+                   InteractionRadius * InteractionRadius;
         }
 
-        public void Dispose()
-        {
-            EndSession();
-        }
-
-        private void BeginSittingScenarios()
-        {
-            Ped player = Game.Player.Character;
-            if (player == null || !player.Exists() || _opponent == null || !_opponent.Exists())
-                throw new InvalidOperationException("Uno de los personajes dejó de estar disponible al llegar a la mesa.");
-
-            // Character facing is not the same setting as the chair mesh heading.
-            // Ask the game to approach the scenario position instead of teleporting there.
-            player.Heading = PlayerHeading;
-            _opponent.Heading = OpponentHeading;
-
-            // TaskInvoker.StartScenario parameters are (teleportToScenario, isSittingScenario).
-            // The player-specific scenario is important for the player ped; do not teleport
-            // either character when the scenario starts because they have already walked there.
-            player.Task.StartScenario(
-                _playerSeatScenario, _playerSeatPosition, -1, false, true);
-            _opponent.Task.StartScenario(
-                _opponentSeatScenario, _opponentSeatPosition, -1, false, true);
-        }
-
-        private bool AreBothCharactersNearApproach()
+        private bool IsOpponentAvailable()
         {
             try
             {
-                Ped player = Game.Player.Character;
-                if (player == null || !player.Exists() || _opponent == null || !_opponent.Exists())
+                if (_opponent == null || !_opponent.Exists() || !_opponentScenarioStarted)
                     return false;
 
-                return DistanceSquared(player.Position, _playerApproachPosition) <= ApproachDistance * ApproachDistance &&
-                       DistanceSquared(_opponent.Position, _opponentApproachPosition) <= ApproachDistance * ApproachDistance;
+                if ((DateTime.UtcNow - _opponentScenarioStartedUtc).TotalSeconds <
+                    ScenarioWarmupSeconds)
+                    return false;
+
+                int ped = _opponent.Handle;
+                Ped player = Game.Player.Character;
+                int playerHandle = player != null && player.Exists() ? player.Handle : 0;
+
+                if (_opponent.IsDeadOrDying ||
+                    Function.Call<bool>(IsEntityDead, ped) ||
+                    Function.Call<bool>(IsEntityOnFire, ped) ||
+                    Function.Call<bool>(IsPedInjured, ped) ||
+                    Function.Call<bool>(IsPedDeadOrDying, ped, true) ||
+                    Function.Call<bool>(IsPedFleeing, ped) ||
+                    Function.Call<bool>(IsPedInCombat, ped, playerHandle) ||
+                    Function.Call<bool>(IsPedShooting, ped) ||
+                    Function.Call<bool>(IsPedFalling, ped) ||
+                    Function.Call<bool>(IsPedBeingStunned, ped, 0) ||
+                    Function.Call<bool>(IsPedRagdoll, ped) ||
+                    Function.Call<bool>(IsPedHogtied, ped) ||
+                    Function.Call<bool>(IsPedFallingOver, ped) ||
+                    Function.Call<bool>(IsPedGettingUp, ped))
+                    return false;
+
+                // If the chair task was interrupted, do not offer the interaction.
+                return Function.Call<bool>(IsPedUsingAnyScenario, ped);
             }
             catch
             {
@@ -266,12 +408,95 @@ namespace TrucoRDR2
             }
         }
 
-        private static float DistanceSquared(Vector3 a, Vector3 b)
+        private bool IsPromptActive()
         {
-            float dx = a.X - b.X;
-            float dy = a.Y - b.Y;
-            float dz = a.Z - b.Z;
-            return dx * dx + dy * dy + dz * dz;
+            try
+            {
+                return _interactionPrompt != 0 &&
+                       Function.Call<bool>(PromptIsValid, _interactionPrompt) &&
+                       Function.Call<bool>(PromptIsActive, _interactionPrompt);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool IsPromptJustPressed()
+        {
+            try
+            {
+                return _interactionPrompt != 0 &&
+                       Function.Call<bool>(PromptIsJustPressed, _interactionPrompt);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void SetPromptEnabled(bool enabled)
+        {
+            try
+            {
+                if (_interactionPrompt == 0 ||
+                    !Function.Call<bool>(PromptIsValid, _interactionPrompt))
+                    return;
+
+                Function.Call(PromptSetVisible, _interactionPrompt, enabled);
+                Function.Call(PromptSetEnabled, _interactionPrompt, enabled);
+            }
+            catch
+            {
+                // Prompt failures must not prevent world-object cleanup.
+            }
+        }
+
+        private void DeletePrompt()
+        {
+            try
+            {
+                if (_interactionPrompt != 0 &&
+                    Function.Call<bool>(PromptIsValid, _interactionPrompt))
+                {
+                    Function.Call(PromptDelete, _interactionPrompt);
+                }
+            }
+            catch
+            {
+                // Prompt may already have been released by the game.
+            }
+            finally
+            {
+                _interactionPrompt = 0;
+                _interactionPromptGroup = 0;
+            }
+        }
+
+        private void EndSession()
+        {
+            _sessionActive = false;
+
+            try
+            {
+                Ped player = Game.Player.Character;
+                if (_hasOriginalPlayerTransform &&
+                    player != null && player.Exists() && !player.IsDeadOrDying &&
+                    !player.IsInCombat &&
+                    IsWithinSessionArea(player.Position))
+                {
+                    player.Task.ClearTasks(true);
+                    player.PositionNoOffset = _originalPlayerPosition;
+                    player.Heading = _originalPlayerHeading;
+                }
+            }
+            catch
+            {
+                // The world scene remains in place even if the player ped is unavailable.
+            }
+
+            _hasOriginalPlayerTransform = false;
+            SetPromptEnabled(false);
         }
 
         private static Prop CreateFurnitureProp(string modelName, Vector3 position, float heading)
@@ -289,44 +514,16 @@ namespace TrucoRDR2
                     "No se pudo crear el objeto '" + modelName + "'. Comprueba el modelo y la ubicación.");
 
             prop.IsMissionEntity = true;
-
-            // Also ask the engine to settle the object's collision against the local floor.
-            // Never use this adjusted object origin as a character's seat Z coordinate.
             ENTITY.PLACE_ENTITY_ON_GROUND_PROPERLY(prop.Handle, true);
             return prop;
         }
 
-        private void UpdateProximityPrompt()
+        private static float DistanceSquared(Vector3 a, Vector3 b)
         {
-            try
-            {
-                Ped player = Game.Player.Character;
-                if (player == null || !player.Exists() || player.IsDeadOrDying)
-                {
-                    IsNearSaloon = false;
-                    return;
-                }
-
-                IsNearSaloon = IsInsideInteractionRange(player.Position);
-                if (IsNearSaloon && DateTime.UtcNow >= _nextPromptUtc)
-                {
-                    Screen.PrintSubtitle("Salón de Valentine: pulsa E para crear la mesa y jugar al truco.");
-                    _nextPromptUtc = DateTime.UtcNow.AddSeconds(PromptIntervalSeconds);
-                }
-            }
-            catch
-            {
-                IsNearSaloon = false;
-            }
-        }
-
-        private static bool IsInsideInteractionRange(Vector3 position)
-        {
-            float dx = position.X - LocationCenter.X;
-            float dy = position.Y - LocationCenter.Y;
-            float dz = position.Z - LocationCenter.Z;
-            return Math.Abs(dz) <= 3.0f &&
-                   dx * dx + dy * dy + dz * dz <= InteractionRadius * InteractionRadius;
+            float dx = a.X - b.X;
+            float dy = a.Y - b.Y;
+            float dz = a.Z - b.Z;
+            return dx * dx + dy * dy + dz * dz;
         }
 
         private static bool IsWithinSessionArea(Vector3 position)
@@ -335,67 +532,6 @@ namespace TrucoRDR2
             float dy = position.Y - LocationCenter.Y;
             float dz = position.Z - LocationCenter.Z;
             return Math.Abs(dz) <= 6.0f && dx * dx + dy * dy + dz * dz <= 144.0f;
-        }
-
-        private void DisableControlsDuringPreparation()
-        {
-            try
-            {
-                PAD.DISABLE_ALL_CONTROL_ACTIONS(0);
-                PAD.DISABLE_ALL_CONTROL_ACTIONS(1);
-                PAD.DISABLE_ALL_CONTROL_ACTIONS(2);
-            }
-            catch
-            {
-                // The task timeout will still let the interaction continue if suppression fails.
-            }
-        }
-
-        private void EndSession()
-        {
-            _preparing = false;
-            _sessionActive = false;
-            _walkingToSeats = false;
-
-            try
-            {
-                Ped player = Game.Player.Character;
-                if (_hasOriginalPlayerTransform &&
-                    player != null && player.Exists() && !player.IsDeadOrDying &&
-                    !player.IsInCombat &&
-                    IsWithinSessionArea(player.Position))
-                {
-                    player.Task.ClearTasks(true);
-                    player.PositionNoOffset = _originalPlayerPosition;
-                    player.Heading = _originalPlayerHeading;
-                }
-            }
-            catch
-            {
-                // Cleanup of furniture and the opponent still proceeds if the player ped is unavailable.
-            }
-
-            _hasOriginalPlayerTransform = false;
-
-            DeleteProp(ref _playerChairProp);
-            DeleteProp(ref _opponentChairProp);
-            DeleteProp(ref _tableProp);
-
-            try
-            {
-                if (_opponent != null && _opponent.Exists())
-                {
-                    _opponent.Task.ClearTasks(true);
-                    _opponent.Delete();
-                }
-            }
-            catch
-            {
-                // An already unloaded/deleted ped does not block session cleanup.
-            }
-
-            _opponent = null;
-            IsNearSaloon = false;
         }
 
         private static void DeleteProp(ref Prop prop)
@@ -407,7 +543,7 @@ namespace TrucoRDR2
             }
             catch
             {
-                // Keep deleting the remaining props even if one object is already invalid.
+                // Keep deleting the remaining objects even if one prop is already invalid.
             }
             finally
             {
