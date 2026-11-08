@@ -268,49 +268,49 @@ namespace TrucoRDR2
 
         private void ProcessPendingCardAnimation()
         {
-            if (_pendingPedAnimations.Count == 0)
-                return;
-
-            PendingPedAnimation pending = _pendingPedAnimations.Peek();
-            if (DateTime.UtcNow > pending.ExpiresUtc)
+            // Rotate requests whose dictionaries are still streaming instead of letting one
+            // missing dictionary block an animation from a different dictionary.
+            int queuedCount = _pendingPedAnimations.Count;
+            for (int i = 0; i < queuedCount; i++)
             {
-                _pendingPedAnimations.Dequeue();
-                return;
-            }
+                PendingPedAnimation pending = _pendingPedAnimations.Dequeue();
+                if (DateTime.UtcNow > pending.ExpiresUtc)
+                    continue;
 
-            try
-            {
-                STREAMING.REQUEST_ANIM_DICT(pending.Dictionary);
-                if (!STREAMING.HAS_ANIM_DICT_LOADED(pending.Dictionary))
+                try
+                {
+                    STREAMING.REQUEST_ANIM_DICT(pending.Dictionary);
+                    if (!STREAMING.HAS_ANIM_DICT_LOADED(pending.Dictionary))
+                    {
+                        _pendingPedAnimations.Enqueue(pending);
+                        continue;
+                    }
+
+                    Ped ped = null;
+                    Ped player = Game.Player.Character;
+                    if (player != null && player.Exists() && player.Handle == pending.PedHandle)
+                        ped = player;
+                    else if (_opponent != null && _opponent.Exists() &&
+                             _opponent.Handle == pending.PedHandle)
+                        ped = _opponent;
+
+                    if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
+                        continue;
+
+                    // Only start one clip per frame. Secondary keeps the table-seating scenario.
+                    ped.Task.PlayAnimation(
+                        pending.Dictionary,
+                        pending.Clip,
+                        8.0f,
+                        -8.0f,
+                        pending.DurationMilliseconds,
+                        pending.Flags);
                     return;
-
-                Ped ped = null;
-                Ped player = Game.Player.Character;
-                if (player != null && player.Exists() && player.Handle == pending.PedHandle)
-                    ped = player;
-                else if (_opponent != null && _opponent.Exists() &&
-                         _opponent.Handle == pending.PedHandle)
-                    ped = _opponent;
-
-                _pendingPedAnimations.Dequeue();
-                if (ped == null || !ped.Exists() || ped.IsDeadOrDying)
-                    return;
-
-                // The wrapper is used only after HAS_ANIM_DICT_LOADED is true, so it does not
-                // block while streaming. Secondary keeps GENERIC_SEAT_CHAIR_TABLE_SCENARIO.
-                ped.Task.PlayAnimation(
-                    pending.Dictionary,
-                    pending.Clip,
-                    8.0f,
-                    -8.0f,
-                    pending.DurationMilliseconds,
-                    pending.Flags);
-            }
-            catch
-            {
-                if (_pendingPedAnimations.Count > 0)
-                    _pendingPedAnimations.Dequeue();
-                // Unknown clips or a streaming failure do not break the hand or seating.
+                }
+                catch
+                {
+                    // Unknown clips or streaming failures never break the hand or seating.
+                }
             }
         }
         private void EnsureWorldSetup()
