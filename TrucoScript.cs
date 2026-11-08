@@ -119,33 +119,13 @@ namespace TrucoRDR2
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            // During the short seating transition, keep input reserved for this interaction.
-            if (_worldInteraction.IsPreparing)
-            {
-                if (e.KeyCode == Keys.Escape)
-                    _worldInteraction.CancelPreparation();
-
-                e.Handled = true;
-                return;
-            }
-
-            // E is the world interaction only near the one supported Valentine saloon table.
-            // Inside the overlay, E remains the Envido key handled by TrucoTablePreview.
-            if (!_tablePreview.IsVisible && !_previewEnabled &&
-                _worldInteraction.IsNearSaloon && e.KeyCode == Keys.E)
-            {
-                if (_worldInteraction.TryBegin())
-                    WriteDiagnostic("Interacción del salón de Valentine iniciada; creando mesa, sillas y preparando los asientos.");
-                else if (!string.IsNullOrEmpty(_worldInteraction.LastError))
-                    WriteDiagnostic("No se pudo iniciar la interacción del salón: " + _worldInteraction.LastError);
-
-                e.Handled = true;
-                return;
-            }
+            // The salon interaction is handled by the native contextual prompt attached
+            // to the seated rival. E is not intercepted globally, so ordinary game
+            // interactions keep their normal bindings outside that prompt.
 
             if (e.KeyCode == _tableToggleBinding.Key && e.Modifiers == _tableToggleBinding.Modifiers)
             {
-                // Ignore repeated KeyDown events until the physical key is released.
+                // Keep the direct shortcut as a development fallback.
                 if (!_tableToggleKeyDown)
                 {
                     _tableToggleKeyDown = true;
@@ -168,7 +148,7 @@ namespace TrucoRDR2
                             SetPreviewEnabled(false);
 
                         _tablePreview.Start();
-                        WriteDiagnostic("Mesa de prueba activada.");
+                        WriteDiagnostic("Mesa de prueba activada mediante el atajo de desarrollo.");
                     }
                 }
 
@@ -178,14 +158,13 @@ namespace TrucoRDR2
 
             if (e.KeyCode == TogglePreviewKey)
             {
-                // The F7 texture viewer and the Ctrl+F9 table prototype are mutually exclusive.
+                // The F7 texture viewer and the table prototype are mutually exclusive.
                 if (_tablePreview.IsVisible)
                 {
                     e.Handled = true;
                     return;
                 }
 
-                // Ignore repeated KeyDown events until the physical key is released.
                 if (!_toggleKeyDown)
                 {
                     _toggleKeyDown = true;
@@ -246,10 +225,17 @@ namespace TrucoRDR2
         private void OnTick(object sender, EventArgs e)
         {
             bool startLocationMatch = _worldInteraction.Update(_tablePreview.IsVisible || _previewEnabled);
+
+            if (_worldInteraction.SessionWasInterrupted && _tablePreview.IsVisible)
+            {
+                _tablePreview.Close();
+                WriteDiagnostic("Mesa cerrada: el rival entró en un estado incompatible (muerte, huida, combate o daño).");
+            }
+
             if (startLocationMatch)
             {
                 _tablePreview.Start();
-                WriteDiagnostic("Mesa de Valentine abierta tras crear el mobiliario y preparar los asientos.");
+                WriteDiagnostic("Mesa de Valentine abierta desde el prompt contextual del rival.");
             }
 
             if (_tablePreview.IsVisible)
@@ -258,9 +244,8 @@ namespace TrucoRDR2
                 return;
             }
 
-            // While seating, controls are suppressed by TrucoWorldInteraction and the
-            // texture viewer must not draw over that transition.
-            if (_worldInteraction.IsPreparing || _worldInteraction.IsSessionActive)
+            // The persistent table scene owns the world while a match is active.
+            if (_worldInteraction.IsSessionActive)
                 return;
 
             if (!_previewEnabled)
