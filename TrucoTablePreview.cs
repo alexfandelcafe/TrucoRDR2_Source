@@ -39,7 +39,6 @@ namespace TrucoRDR2
 
         private readonly string _textureDictionary;
         private readonly TrucoWorldInteraction _worldInteraction;
-        private readonly string _tableToggleText;
         private int _targetPoints;
         private bool _florEnabled;
         private bool _soundEnabled;
@@ -93,9 +92,8 @@ namespace TrucoRDR2
             get { return _match != null && (_match.IsComplete || _match.Round.IsComplete); }
         }
 
-        public TrucoTablePreview(string textureDictionary, string tableToggleText,
-            int targetPoints, bool florEnabled, bool soundEnabled,
-            TrucoWorldInteraction worldInteraction)
+        public TrucoTablePreview(string textureDictionary, int targetPoints,
+            bool florEnabled, bool soundEnabled, TrucoWorldInteraction worldInteraction)
         {
             if (string.IsNullOrEmpty(textureDictionary))
                 throw new ArgumentException("El nombre del diccionario no puede estar vacío.", "textureDictionary");
@@ -104,7 +102,6 @@ namespace TrucoRDR2
 
             _textureDictionary = textureDictionary;
             _worldInteraction = worldInteraction;
-            _tableToggleText = string.IsNullOrEmpty(tableToggleText) ? "COMBINACION" : tableToggleText.ToUpperInvariant();
             _targetPoints = targetPoints;
             _florEnabled = florEnabled;
             _soundEnabled = soundEnabled;
