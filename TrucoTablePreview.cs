@@ -78,6 +78,13 @@ namespace TrucoRDR2
         private DateTime _nextComputerActionUtc;
         private DateTime _dealAnimationStartUtc;
         private bool _dealAnimationActive;
+        private bool _initialDealPending;
+        private bool _initialDealSequenceStarted;
+        private int _initialDealLastTriggeredIndex = -1;
+        private DateTime _initialDealWaitStartedUtc;
+        private const int InitialDealCardCount = 6;
+        private const double InitialDealCardIntervalSeconds = 0.62;
+        private const double InitialDealCardFlightSeconds = 0.48;
         private CardAnimation _playedCardAnimation;
 
         public bool IsVisible { get { return _visible; } }
@@ -192,27 +199,27 @@ namespace TrucoRDR2
         public void Start()
         {
             _visible = true;
-
-            if (_match == null)
-            {
-                _showMenu = true;
-                _menuSelection = 0;
-                UpdateMenuText();
-            }
-            else
-            {
-                _showMenu = false;
-            }
-
-            SetHeaderForMenu(_showMenu);
             DisposeSprites();
             _textureRequestSent = false;
             _textureDictionaryLoaded = false;
             _textureRequestTimeUtc = DateTime.UtcNow;
-            _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             _dealAnimationActive = false;
+            _initialDealPending = false;
+            _initialDealSequenceStarted = false;
+            _initialDealLastTriggeredIndex = -1;
             _playedCardAnimation = null;
             _spritesCreated = false;
+
+            // Starting from the NPC prompt begins the hand immediately; no extra menu.
+            if (_match == null)
+            {
+                StartMatch();
+                return;
+            }
+
+            _showMenu = false;
+            SetHeaderForMenu(false);
+            _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             UpdateHandLabels();
         }
 
@@ -222,17 +229,28 @@ namespace TrucoRDR2
             _showMenu = false;
             SetHeaderForMenu(false);
             _selectedCardIndex = 0;
+            _playedCardAnimation = null;
+            _spritesCreated = false;
+            DisposeSprites();
+            BeginInitialDealSequence();
+        }
+
+        private void BeginInitialDealSequence()
+        {
+            _initialDealPending = true;
+            _initialDealSequenceStarted = false;
+            _initialDealLastTriggeredIndex = -1;
+            _initialDealWaitStartedUtc = DateTime.UtcNow;
+            _dealAnimationStartUtc = DateTime.MinValue;
+            _dealAnimationActive = true;
+            _nextComputerActionUtc = DateTime.MaxValue;
             _textureRequestSent = false;
             _textureDictionaryLoaded = false;
             _textureRequestTimeUtc = DateTime.UtcNow;
-            _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
-            _dealAnimationStartUtc = DateTime.UtcNow;
-            _dealAnimationActive = true;
             _playedCardAnimation = null;
             _spritesCreated = false;
             DisposeSprites();
             UpdateHandLabels();
-            TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
         }
 
         private void UpdateMenuText()
@@ -277,20 +295,16 @@ namespace TrucoRDR2
 
             _match.StartNextRound();
             _selectedCardIndex = 0;
-            _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
-            _dealAnimationStartUtc = DateTime.UtcNow;
-            _dealAnimationActive = !_match.IsComplete;
-            _playedCardAnimation = null;
-            _spritesCreated = false;
-            DisposeSprites();
-            UpdateHandLabels();
-            TrucoAudio.Play(_soundEnabled, _match.IsComplete ? TrucoSound.Win : TrucoSound.Deal);
+            BeginInitialDealSequence();
         }
 
         public void Close()
         {
             _visible = false;
             _dealAnimationActive = false;
+            _initialDealPending = false;
+            _initialDealSequenceStarted = false;
+            _initialDealLastTriggeredIndex = -1;
             _playedCardAnimation = null;
             DisposeSprites();
             // Keep the match, score and current hand so reopening the table resumes play.
@@ -319,6 +333,12 @@ namespace TrucoRDR2
             if (e.KeyCode == Keys.Escape)
             {
                 Close();
+                e.Handled = true;
+                return;
+            }
+
+            if (_initialDealPending)
+            {
                 e.Handled = true;
                 return;
             }
@@ -603,9 +623,6 @@ namespace TrucoRDR2
             if (_match == null)
                 return;
 
-            DrawTopPanel();
-            DrawTableSurface();
-
             bool dictionaryExists = false;
             bool dictionaryLoaded = false;
             try
@@ -624,13 +641,43 @@ namespace TrucoRDR2
             {
                 _textureDictionaryLoaded = false;
                 SetCaption(_status, "Error consultando el YTD (" + ex.GetType().Name + ").");
-                DrawTextOnly();
+                if (_initialDealPending)
+                {
+                    DrawTableSurface();
+                    DrawTextElement(_status);
+                }
+                else
+                {
+                    DrawTopPanel();
+                    DrawTableSurface();
+                    DrawTextOnly();
+                }
                 return;
             }
 
             _textureDictionaryLoaded = dictionaryLoaded;
+            if (_initialDealPending)
+            {
+                if (!dictionaryLoaded)
+                {
+                    DrawTableSurface();
+                    if (!dictionaryExists &&
+                        (DateTime.UtcNow - _textureRequestTimeUtc).TotalSeconds >= 5.0)
+                        SetCaption(_status, "No se encuentra '" + _textureDictionary + "'. Instala el YTD para repartir las cartas.");
+                    else
+                        SetCaption(_status, "Preparando el mazo y las cartas...");
+                    DrawTextElement(_status);
+                    return;
+                }
+
+                DrawInitialDeal();
+                return;
+            }
+
             if (!dictionaryLoaded)
             {
+                DrawTopPanel();
+                DrawTableSurface();
                 if (!dictionaryExists &&
                     (DateTime.UtcNow - _textureRequestTimeUtc).TotalSeconds >= 5.0)
                     SetCaption(_status, "No se encuentra '" + _textureDictionary + "'. Revisa la instalación del YTD.");
@@ -642,6 +689,8 @@ namespace TrucoRDR2
                 return;
             }
 
+            DrawTopPanel();
+            DrawTableSurface();
             AdvanceComputer();
 
             if (!_spritesCreated)
@@ -704,6 +753,106 @@ namespace TrucoRDR2
             DrawTextElement(_status);
         }
 
+        private void DrawInitialDeal()
+        {
+            if (_match == null || _match.Round == null)
+                return;
+
+            DrawTableSurface();
+
+            if (!_initialDealSequenceStarted)
+            {
+                _initialDealSequenceStarted = true;
+                _dealAnimationStartUtc = DateTime.UtcNow;
+                _initialDealLastTriggeredIndex = -1;
+                _nextComputerActionUtc = DateTime.MaxValue;
+                SetCaption(_status, "REPARTIENDO CARTAS...");
+                TrucoAudio.Play(_soundEnabled, TrucoSound.Deal);
+            }
+
+            double elapsed = (DateTime.UtcNow - _dealAnimationStartUtc).TotalSeconds;
+            int currentDealIndex = Math.Min(
+                InitialDealCardCount - 1,
+                Math.Max(0, (int)(elapsed / InitialDealCardIntervalSeconds)));
+
+            // The mano receives the first card, then the dealer; repeat until both have three.
+            // The dealer animates only when sending a card across the table to the other seat.
+            while (_initialDealLastTriggeredIndex < currentDealIndex)
+            {
+                int dealIndex = ++_initialDealLastTriggeredIndex;
+                TrucoPlayer recipient = (dealIndex % 2 == 0)
+                    ? _match.Round.Mano
+                    : OtherPlayer(_match.Round.Mano);
+                if (recipient == _match.Round.Mano && _worldInteraction != null)
+                {
+                    TrucoPlayer dealer = OtherPlayer(_match.Round.Mano);
+                    _worldInteraction.PlayCardDealAnimation(dealer == TrucoPlayer.Player);
+                }
+            }
+
+            PointF deckPosition = LayoutPoint(925.0f, 430.0f);
+            SizeF sourceSize = LayoutSize(72.0f, 108.0f);
+            DrawTransientSprite(OpponentBackTextureName, sourceSize, deckPosition);
+
+            IList<TrucoCard> playerCards = _match.Round.PlayerCards;
+            for (int dealIndex = 0; dealIndex < InitialDealCardCount; dealIndex++)
+            {
+                double cardStart = dealIndex * InitialDealCardIntervalSeconds;
+                if (elapsed < cardStart)
+                    continue;
+
+                TrucoPlayer recipient = (dealIndex % 2 == 0)
+                    ? _match.Round.Mano
+                    : OtherPlayer(_match.Round.Mano);
+                int cardIndex = dealIndex / 2;
+                bool isPlayerCard = recipient == TrucoPlayer.Player;
+                string textureName = isPlayerCard
+                    ? playerCards[cardIndex].TextureName
+                    : OpponentBackTextureName;
+                PointF target = isPlayerCard
+                    ? _handPositions[cardIndex]
+                    : new PointF(
+                        _opponentCardBackPositions[cardIndex].X + LayoutWidth(4.0f),
+                        _opponentCardBackPositions[cardIndex].Y + LayoutHeight(4.0f));
+                SizeF targetSize = isPlayerCard
+                    ? LayoutSize(HandCardWidth, HandCardHeight)
+                    : LayoutSize(OpponentBackWidth - 8.0f, OpponentBackHeight - 8.0f);
+
+                double cardElapsed = elapsed - cardStart;
+                if (cardElapsed < InitialDealCardFlightSeconds)
+                {
+                    float t = Ease((float)(cardElapsed / InitialDealCardFlightSeconds));
+                    DrawTransientSprite(
+                        textureName,
+                        new SizeF(
+                            Lerp(sourceSize.Width, targetSize.Width, t),
+                            Lerp(sourceSize.Height, targetSize.Height, t)),
+                        Lerp(deckPosition, target, t));
+                }
+                else
+                {
+                    DrawTransientSprite(textureName, targetSize, target);
+                }
+            }
+
+            if (elapsed >=
+                (InitialDealCardCount - 1) * InitialDealCardIntervalSeconds + InitialDealCardFlightSeconds)
+            {
+                _initialDealPending = false;
+                _initialDealSequenceStarted = false;
+                _dealAnimationActive = false;
+                _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
+                RefreshSprites();
+                UpdateText();
+            }
+
+            DrawTextElement(_status);
+        }
+
+        private static TrucoPlayer OtherPlayer(TrucoPlayer player)
+        {
+            return player == TrucoPlayer.Player ? TrucoPlayer.Opponent : TrucoPlayer.Player;
+        }
         private void AdvanceComputer()
         {
             if (_match.IsComplete || _match.Round.IsComplete ||
@@ -919,8 +1068,6 @@ namespace TrucoRDR2
                 TrucoCard playedCard = round.PlayerCards[_selectedCardIndex];
                 PointF from = _handPositions[_selectedCardIndex];
                 round.PlayCard(TrucoPlayer.Player, _selectedCardIndex);
-                if (_worldInteraction != null)
-                    _worldInteraction.PlayCardDealAnimation(true);
                 StartPlayedCardAnimation(TrucoPlayer.Player, playedCard, from);
                 _selectedCardIndex = Math.Min(_selectedCardIndex, Math.Max(0, round.PlayerCards.Count - 1));
                 _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
@@ -949,8 +1096,6 @@ namespace TrucoRDR2
             TrucoCard playedCard = cards[cardIndex];
             PointF from = _opponentCardBackPositions[Math.Min(cardIndex, _opponentCardBackPositions.Length - 1)];
             round.PlayCard(TrucoPlayer.Opponent, cardIndex);
-            if (_worldInteraction != null)
-                _worldInteraction.PlayCardDealAnimation(false);
             StartPlayedCardAnimation(TrucoPlayer.Opponent, playedCard, from);
             RefreshSprites();
             TrucoAudio.Play(_soundEnabled,
