@@ -261,7 +261,10 @@ namespace TrucoRDR2
         private void EnsureCompanionRecruitmentExclusion()
         {
             if (_opponent == null || !_opponent.Exists())
+            {
+                _companionExcludedPedHandle = 0;
                 return;
+            }
 
             _companionExcludedPedHandle = _opponent.Handle;
             if ((_companionEligibilityPatchInstalled && _companionSocialPromptPatchInstalled) ||
