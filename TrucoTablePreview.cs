@@ -827,7 +827,7 @@ namespace TrucoRDR2
                 Math.Max(0, (int)(elapsed / InitialDealCardIntervalSeconds)));
 
             // The mano receives the first card, then the dealer; repeat until both have three.
-            // The dealer animates only when sending a card across the table to the other seat.
+            // Every card triggers the dealer's gesture for its destination: other seat or self.
             while (_initialDealLastTriggeredIndex < currentDealIndex)
             {
                 int dealIndex = ++_initialDealLastTriggeredIndex;
