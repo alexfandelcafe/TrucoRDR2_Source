@@ -245,7 +245,7 @@ namespace TrucoRDR2
 
         private void OnTick(object sender, EventArgs e)
         {
-            bool startLocationMatch = _worldInteraction.Update(_tablePreview.IsVisible);
+            bool startLocationMatch = _worldInteraction.Update(_tablePreview.IsVisible || _previewEnabled);
             if (startLocationMatch)
             {
                 _tablePreview.Start();
