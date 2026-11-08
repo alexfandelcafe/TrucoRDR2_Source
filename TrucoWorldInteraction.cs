@@ -150,6 +150,10 @@ namespace TrucoRDR2
             SetPromptEnabled(false);
             DeletePrompt();
 
+            // The Harmony filter remains harmless after shutdown because handle 0 is never
+            // treated as the excluded ped. A later Truco script instance can set a new handle.
+            _companionExcludedPedHandle = 0;
+
             DeleteProp(ref _playerChairProp);
             DeleteProp(ref _opponentChairProp);
             DeleteProp(ref _tableProp);
@@ -166,10 +170,6 @@ namespace TrucoRDR2
             {
                 // Continue cleanup even if the NPC was already removed by the game.
             }
-
-            if (_opponent != null && _opponent.Exists() &&
-                _companionExcludedPedHandle == _opponent.Handle)
-                _companionExcludedPedHandle = 0;
 
             _opponent = null;
             _worldSetupComplete = false;
