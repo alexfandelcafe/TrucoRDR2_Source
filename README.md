@@ -2,7 +2,7 @@
 
 Este proyecto C# compila como `TrucoRDR2.dll` para ScriptHookRDR2DotNet V2.2.0 / .NET Framework 4.8.
 
-**Alcance de esta build:** carga y prueba las 40 texturas y ofrece una partida mano a mano de truco argentino con tanteador, apuestas de envido y truco, flor opcional, IA heurística mejorada y un prototipo de interacción física en una única ubicación: el salón de Valentine.
+**Alcance de esta build:** carga y prueba las 40 texturas y ofrece una partida mano a mano de truco argentino con tanteador, apuestas de envido y truco, flor opcional, IA heurística mejorada y una interacción física persistente en una única ubicación: el salón de Valentine.
 
 ## Requisitos
 
@@ -124,24 +124,23 @@ Las opciones que no correspondan al canto pendiente se ignoran. El envido se cie
 - No querer Truco, Retruco o Vale Cuatro entrega la mano por el valor anterior de la apuesta.
 - Al terminar una mano, `Enter` reparte la siguiente.
 - Al terminar la partida, `Enter` vuelve al menú; desde ahí podés iniciar otra.
-- `Esc` cierra la mesa y, si se inició desde el salón, termina la interacción física y libera al rival temporal.
-- En el salón de Valentine, `E` es la interacción principal. `Ctrl+F9` sigue disponible para abrir la interfaz directamente como acceso de desarrollo; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
+- `Esc` cierra la mesa y restaura la posición del jugador; la mesa, las sillas y el rival permanecen en el salón hasta que se descarga el script.
+- En el salón de Valentine, el prompt contextual del rival muestra la acción `E` para iniciar. `Ctrl+F9` sigue disponible como atajo de desarrollo; se evitan F8 (consola de ScriptHookRDR2DotNet) e Insert (recarga de scripts).
 
-### Interacción con el mundo (prototipo de una ubicación)
+### Interacción con el mundo (escena persistente de Valentine)
 
-La primera ubicación está fijada al salón de Valentine. El mod detecta al jugador cerca del punto de interacción, muestra un subtítulo y permite iniciar con `E`.
+La escena del salón de Valentine se prepara al inicializar el script, no al pulsar E.
 
-- Al iniciar se guarda la posición y orientación originales del jugador.
-- El mod crea una mesa (`p_table01x`) y dos sillas (`p_chair02x`) y apoya los objetos en el suelo.
-- El jugador camina hasta la silla y el rival también navega desde un punto cercano; ninguno se teletransporta desde su posición inicial.
-- El punto final de sentado se calcula como un desplazamiento local de cada silla (`GetOffsetPosition`): unos centímetros delante del respaldo y aproximadamente 0,50 m por encima del origen del modelo. El punto de aproximación queda más atrás, para que el personaje camine y llegue antes de sentarse.
-- El jugador usa `PROP_HUMAN_SEAT_CHAIR_MP_PLAYER` y el rival `PROP_HUMAN_SEAT_CHAIR`. En `TaskInvoker.StartScenario`, el orden de los argumentos es `teleportToScenario` y luego `isSittingScenario`; ambos se invocan con `false, true`, porque los personajes ya caminaron hasta la silla y no deben teletransportarse al iniciar el escenario.
-- Las orientaciones de las mallas de las sillas son independientes de las orientaciones finales de los personajes.
-- Si falla la creación de un objeto o el inicio de las tareas, se cancela la preparación y se limpian los elementos temporales.
-- Al cerrar con `Esc`, cancelar la preparación o descargar el script, se limpian las tareas, se elimina el rival temporal y se borran los tres objetos; el jugador se restaura si sigue vivo, fuera de combate y cerca de la mesa.
-- `Ctrl+F9` sigue disponible como acceso directo de desarrollo para abrir la interfaz directamente sin desplazarse al salón y sin crear muebles.
+- El mod crea la mesa (p_table01x), las dos sillas (p_chair02x) y el rival al iniciar el script. Los objetos se apoyan sobre el suelo del interior y permanecen en su sitio mientras el script está cargado.
+- El rival aparece sentado desde el inicio con el escenario PROP_HUMAN_SEAT_CHAIR.
+- Al acercarse al rival aparece un prompt contextual nativo asociado a su entidad: “Jugar al truco — E”. Se utiliza el grupo de prompts del NPC y se activa ese grupo exclusivo mientras el jugador está dentro del radio de interacción.
+- El jugador no camina hasta la silla. Al aceptar el prompt, se guarda su posición original y se inicia directamente PROP_HUMAN_SEAT_CHAIR en la posición de su silla.
+- El prompt no se ofrece si el jugador está muerto, montado o en combate. También se oculta si el rival muere, huye, está asustado, entra en combate, recibe daño, se cae, queda aturdido, está en ragdoll, arde, queda hogtied o deja de ejecutar un escenario.
+- Si el rival entra en uno de esos estados durante una partida, la mesa se cierra y se restaura la posición original del jugador cuando es seguro hacerlo. No se crea un rival sustituto automáticamente.
+- Al cerrar con Esc, la partida termina pero los muebles y el rival permanecen en el mundo. Al descargar/abortar el script se eliminan el prompt, los objetos y el rival.
+- Ctrl+F9 sigue disponible como atajo de desarrollo para abrir la interfaz sin usar el prompt del NPC.
 
-El punto de referencia aproximado del salón es `(-307.715, 802.857, 118.979)`. El desplazamiento local de sentado (`y = -0,05`, `z = 0,50`) es una calibración inicial para el modelo `p_chair02x` y debe probarse visualmente. Los escenarios de silla están documentados en la lista de escenarios de RDR2; los nombres por sí solos no garantizan que el modelo creado por script tenga el mismo punto de asiento que una silla colocada por el juego.
+El punto de referencia aproximado del salón es (-307.715, 802.857, 118.979). El punto de sentado se calcula como un desplazamiento local de la silla (GetOffsetPosition): y = -0,05, z = 0,50. La escena y el prompt requieren validación visual en el juego; la activación del grupo exclusivo controla los prompts normales, pero los grupos ambientales independientes del propio RDR2 pueden seguir siendo administrados por el motor.
 
 ### Rival controlado por IA
 
