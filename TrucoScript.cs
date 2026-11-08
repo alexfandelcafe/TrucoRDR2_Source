@@ -71,7 +71,8 @@ namespace TrucoRDR2
                 FormatKeyBinding(_tableToggleBinding),
                 ReadMatchTargetSetting(),
                 ReadFlorEnabledSetting(),
-                ReadSoundEnabledSetting());
+                ReadSoundEnabledSetting(),
+                _worldInteraction);
             _worldInteraction = new TrucoWorldInteraction();
 
             string scriptDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
