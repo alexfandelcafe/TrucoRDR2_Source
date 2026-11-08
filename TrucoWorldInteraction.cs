@@ -56,6 +56,7 @@ namespace TrucoRDR2
         private const ulong IsEntityOnFire = 0x1BD7C371CE257C3E;
         private const ulong IsPedInjured = 0x84A2DD9AC37C35C1;
         private const ulong IsPedDeadOrDying = 0x3317DEDB88C95038;
+        private const ulong IsPedInCombat = 0x4859F1FC66A6278E;
         private const ulong IsPedShooting = 0x34616828CD07F1A1;
         private const ulong IsPedFalling = 0xFB92A102F1C4DFA3;
         private const ulong IsPedBeingStunned = 0x4FBACCE3B4138EE8;
