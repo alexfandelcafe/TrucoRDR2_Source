@@ -425,7 +425,7 @@ namespace TrucoRDR2
                 }
 
                 _companionPromptIntegrationStatus =
-                    "Cabalga conmigo y los prompts sociales de Companion/EnRAGE excluidos únicamente para el NPC del truco. Jugar al truco usa el mismo MakePrompt de Companion.";
+                    "Cabalga conmigo y los prompts sociales de Companion/EnRAGE excluidos únicamente para el NPC del truco. El prompt de Truco se registra de forma autónoma.";
 
                 // If Companion had already created its prompt before these patches were installed,
                 // remove that stale action now. The Harmony filters prevent it from returning.
