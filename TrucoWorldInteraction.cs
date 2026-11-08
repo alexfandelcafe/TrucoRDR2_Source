@@ -147,6 +147,10 @@ namespace TrucoRDR2
             }
 
             SetPromptEnabled(true);
+            // Retain the world-space label the user preferred. When the native Companion
+            // prompt renders correctly, this is a nearby contextual label rather than a
+            // replacement for the actual hold-mode interaction.
+            DrawWorldInteractionPrompt();
 
             // The Companion factory creates its normal hold-mode prompt. Match its own
             // completion/arming behavior rather than treating the hold prompt as a key press.
@@ -159,17 +163,11 @@ namespace TrucoRDR2
                 if (!holdCompleted)
                 {
                     _interactionPromptArmed = true;
-                    if (!IsPromptActive())
-                        DrawWorldInteractionPrompt();
                     return false;
                 }
 
                 if (!_interactionPromptArmed)
-                {
-                    if (!IsPromptActive())
-                        DrawWorldInteractionPrompt();
                     return false;
-                }
 
                 _interactionPromptArmed = false;
                 return TryBegin(player);
