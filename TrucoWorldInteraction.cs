@@ -20,15 +20,15 @@ namespace TrucoRDR2
         private static readonly Vector3 LocationCenter =
             new Vector3(-307.7149f, 802.8571f, 118.9794f);
         private static readonly Vector3 TablePosition = LocationCenter;
-        // Place chairs at their original, closer positions. Chairs are kept at the known
-        // interior floor Z directly; grounding them can snap them onto the tabletop collision.
+        // Place the new Windsor chairs at the current tested seat coordinates. They are kept at
+        // the known interior floor Z directly; grounding them can snap them onto the tabletop collision.
         private static readonly Vector3 PlayerSeat =
             new Vector3(-309.05f, 802.8571f, 118.9794f);
         private static readonly Vector3 OpponentSeat =
             new Vector3(-306.38f, 802.8571f, 118.9794f);
 
-        private const string TableModelName = "p_table01x";
-        private const string ChairModelName = "p_chair02x";
+        private const string TableModelName = "p_table06x";
+        private const string ChairModelName = "p_windsorchair03x";
         private const float TableHeading = 90.0f;
         private const float PlayerChairHeading = 90.0f;
         private const float OpponentChairHeading = 270.0f;
