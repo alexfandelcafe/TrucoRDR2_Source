@@ -38,6 +38,7 @@ namespace TrucoRDR2
         }
 
         private readonly string _textureDictionary;
+        private readonly TrucoWorldInteraction _worldInteraction;
         private readonly string _tableToggleText;
         private int _targetPoints;
         private bool _florEnabled;
@@ -86,7 +87,8 @@ namespace TrucoRDR2
         }
 
         public TrucoTablePreview(string textureDictionary, string tableToggleText,
-            int targetPoints, bool florEnabled, bool soundEnabled)
+            int targetPoints, bool florEnabled, bool soundEnabled,
+            TrucoWorldInteraction worldInteraction)
         {
             if (string.IsNullOrEmpty(textureDictionary))
                 throw new ArgumentException("El nombre del diccionario no puede estar vacío.", "textureDictionary");
@@ -94,6 +96,7 @@ namespace TrucoRDR2
                 throw new ArgumentOutOfRangeException("targetPoints");
 
             _textureDictionary = textureDictionary;
+            _worldInteraction = worldInteraction;
             _tableToggleText = string.IsNullOrEmpty(tableToggleText) ? "COMBINACION" : tableToggleText.ToUpperInvariant();
             _targetPoints = targetPoints;
             _florEnabled = florEnabled;
@@ -916,6 +919,8 @@ namespace TrucoRDR2
                 TrucoCard playedCard = round.PlayerCards[_selectedCardIndex];
                 PointF from = _handPositions[_selectedCardIndex];
                 round.PlayCard(TrucoPlayer.Player, _selectedCardIndex);
+                if (_worldInteraction != null)
+                    _worldInteraction.PlayCardDealAnimation(true);
                 StartPlayedCardAnimation(TrucoPlayer.Player, playedCard, from);
                 _selectedCardIndex = Math.Min(_selectedCardIndex, Math.Max(0, round.PlayerCards.Count - 1));
                 _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
@@ -944,6 +949,8 @@ namespace TrucoRDR2
             TrucoCard playedCard = cards[cardIndex];
             PointF from = _opponentCardBackPositions[Math.Min(cardIndex, _opponentCardBackPositions.Length - 1)];
             round.PlayCard(TrucoPlayer.Opponent, cardIndex);
+            if (_worldInteraction != null)
+                _worldInteraction.PlayCardDealAnimation(false);
             StartPlayedCardAnimation(TrucoPlayer.Opponent, playedCard, from);
             RefreshSprites();
             TrucoAudio.Play(_soundEnabled,
@@ -1303,7 +1310,7 @@ namespace TrucoRDR2
                 ToWidth = LayoutWidth(PlayedCardWidth),
                 ToHeight = LayoutHeight(PlayedCardHeight),
                 StartedUtc = DateTime.UtcNow,
-                DurationSeconds = 0.28
+                DurationSeconds = 0.45
             };
         }
 
