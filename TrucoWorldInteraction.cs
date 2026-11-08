@@ -17,10 +17,13 @@ namespace TrucoRDR2
         private static readonly Vector3 LocationCenter =
             new Vector3(-307.7149f, 802.8571f, 118.9794f);
         private static readonly Vector3 TablePosition = LocationCenter;
+        // Keep both chairs outside the tabletop collision footprint. When a chair is
+        // spawned too close to the table, PLACE_ENTITY_ON_GROUND_PROPERLY can settle it
+        // on the tabletop instead of the saloon floor.
         private static readonly Vector3 PlayerSeat =
-            new Vector3(-309.05f, 802.8571f, 118.9794f);
+            new Vector3(-309.65f, 802.8571f, 118.9794f);
         private static readonly Vector3 OpponentSeat =
-            new Vector3(-306.38f, 802.8571f, 118.9794f);
+            new Vector3(-305.78f, 802.8571f, 118.9794f);
 
         private const string TableModelName = "p_table01x";
         private const string ChairModelName = "p_chair02x";
@@ -200,13 +203,12 @@ namespace TrucoRDR2
                 if (_opponentChairProp == null || !_opponentChairProp.Exists())
                     _opponentChairProp = CreateFurnitureProp(ChairModelName, OpponentSeat, OpponentChairHeading);
 
-                // Scenario coordinates are chair-origin coordinates. The sitting task
-                // performs its own vertical alignment; adding +0.50 m put the ped above the
-                // seat and could leave the NPC appearing on the tabletop.
+                // Keep the previously aligned seat-height offset, but move the chairs
+                // beyond the table footprint so ground placement cannot put them on top.
                 _playerSeatPosition =
-                    _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.0f));
+                    _playerChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
                 _opponentSeatPosition =
-                    _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.0f));
+                    _opponentChairProp.GetOffsetPosition(new Vector3(0.0f, -0.05f, 0.50f));
 
                 // Spawn the rival only once. A dead or removed rival is deliberately
                 // not replaced, so the interaction stays unavailable after that event.
