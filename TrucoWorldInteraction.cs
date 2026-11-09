@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Text;
 using RDR2;
 using RDR2.Math;
 using RDR2.Native;
@@ -52,8 +50,6 @@ namespace TrucoRDR2
         private const ulong PromptDelete = 0x00EDE88D4D13CF59;
         private const uint PromptControlHash = 1980406895; // eInputType.InteractOption1
         private const uint StandardizedHoldMode = 1704213876; // enRAGE standardized hold mode
-        private static readonly Dictionary<string, IntPtr> PromptPersistentStrings =
-            new Dictionary<string, IntPtr>(StringComparer.Ordinal);
 
         private const ulong IsEntityDead = 0x7D5B1F88E7504BBA;
         private const ulong IsEntityOnFire = 0x1BD7C371CE257C3E;
@@ -937,8 +933,9 @@ namespace TrucoRDR2
             try
             {
                 HUD._UI_PROMPT_SET_CONTROL_ACTION(prompt, PromptControlHash);
-                Function.Call(PromptSetText, prompt,
-                    new InputArgument(PromptForeverVarString("Jugar al truco")));
+                string promptText = Function.Call<string>(
+                    (Hash)PromptVarString, 10, "LITERAL_STRING", "Jugar al truco");
+                Function.Call((Hash)PromptSetText, prompt, promptText);
                 HUD._UI_PROMPT_SET_STANDARDIZED_HOLD_MODE(prompt, StandardizedHoldMode);
                 HUD._UI_PROMPT_SET_GROUP(prompt, group, 0);
                 HUD._UI_PROMPT_REGISTER_END(prompt);
@@ -961,33 +958,6 @@ namespace TrucoRDR2
                 _interactionPromptArmed = false;
                 throw;
             }
-        }
-
-        // Matches enRAGE UiDraw.ForeverString: native text pointers must remain valid
-        // after the prompt is registered and rendered in later frames.
-        private static ulong PromptForeverString(string text)
-        {
-            IntPtr pointer;
-            if (!PromptPersistentStrings.TryGetValue(text, out pointer))
-            {
-                byte[] bytes = Encoding.UTF8.GetBytes(text ?? string.Empty);
-                pointer = Marshal.AllocHGlobal(bytes.Length + 1);
-                Marshal.Copy(bytes, 0, pointer, bytes.Length);
-                Marshal.WriteByte(pointer, bytes.Length, 0);
-                PromptPersistentStrings[text] = pointer;
-            }
-
-            return unchecked((ulong)pointer.ToInt64());
-        }
-
-        private static ulong PromptForeverVarString(string text)
-        {
-            return Function.Call<ulong>(PromptVarString, new InputArgument[3]
-            {
-                10,
-                new InputArgument(PromptForeverString("LITERAL_STRING")),
-                new InputArgument(PromptForeverString(text))
-            });
         }
 
         private static Type FindCompanionHooksType()
