@@ -37,6 +37,21 @@ namespace TrucoRDR2
             public double DurationSeconds;
         }
 
+        private sealed class ActionHint
+        {
+            public readonly string Key;
+            public readonly string Label;
+            public readonly float KeyWidth;
+            public bool Enabled;
+
+            public ActionHint(string key, string label, float keyWidth)
+            {
+                Key = key;
+                Label = label;
+                KeyWidth = keyWidth;
+            }
+        }
+
         private readonly string _textureDictionary;
         private readonly TrucoWorldInteraction _worldInteraction;
         private int _targetPoints;
@@ -61,6 +76,22 @@ namespace TrucoRDR2
         private readonly TextElement _menuOptions;
         private readonly TextElement _menuHint;
         private readonly TextElement[] _handLabels = new TextElement[3];
+        private readonly ActionHint[] _actionHints =
+        {
+            new ActionHint("← →", "ELEGIR", 48.0f),
+            new ActionHint("ENTER", "JUGAR", 58.0f),
+            new ActionHint("E", "ENVIDO", 27.0f),
+            new ActionHint("R", "REAL", 27.0f),
+            new ActionHint("F", "FALTA", 27.0f),
+            new ActionHint("T", "TRUCO", 27.0f),
+            new ActionHint("M", "MAZO", 27.0f),
+            new ActionHint("Q", "QUIERO", 27.0f),
+            new ActionHint("N", "NO QUIERO", 27.0f),
+            new ActionHint("C", "CONTRA FLOR", 27.0f),
+            new ActionHint("B", "CONTRA FLOR AL RESTO", 27.0f),
+            new ActionHint("ENTER", "SIGUIENTE MANO", 58.0f),
+            new ActionHint("ENTER", "VOLVER AL MENU", 58.0f)
+        };
         private readonly TextElement[] _playedLabels = new TextElement[6];
         private readonly Sprite[] _handSprites = new Sprite[3];
         private readonly Sprite[] _opponentRevealSprites = new Sprite[3];
@@ -127,32 +158,36 @@ namespace TrucoRDR2
 
             _header = new TextElement(
                 "TRUCO RDR2",
-                LayoutPoint(960.0f, 65.0f), LayoutTextScale(0.70f), Color.Wheat,
+                LayoutPoint(960.0f, 49.0f), LayoutTextScale(0.74f),
+                Color.FromArgb(239, 213, 169),
                 Alignment.Center, true, true);
 
             _instructions = new TextElement(
-                "E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO | Q QUIERO | N NO QUIERO | FLECHAS + ENTER",
-                LayoutPoint(960.0f, 112.0f), LayoutTextScale(0.34f), Color.WhiteSmoke,
+                "TRUCO ARGENTINO  ·  MANO A MANO",
+                LayoutPoint(960.0f, 88.0f), LayoutTextScale(0.30f),
+                Color.FromArgb(215, 205, 188),
                 Alignment.Center, true, true);
 
             _scoreboard = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 165.0f), LayoutTextScale(0.55f), Color.White,
+                LayoutPoint(960.0f, 137.0f), LayoutTextScale(0.57f), Color.White,
                 Alignment.Center, true, true);
 
             _roundInfo = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 198.0f), LayoutTextScale(0.36f), Color.WhiteSmoke,
+                LayoutPoint(960.0f, 172.0f), LayoutTextScale(0.33f), Color.WhiteSmoke,
                 Alignment.Center, true, true);
 
             _roundDetails = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 225.0f), LayoutTextScale(0.36f), Color.WhiteSmoke,
+                LayoutPoint(960.0f, 197.0f), LayoutTextScale(0.32f),
+                Color.FromArgb(218, 210, 196),
                 Alignment.Center, true, true);
 
             _announcement = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 252.0f), LayoutTextScale(0.34f), Color.Wheat,
+                LayoutPoint(960.0f, 222.0f), LayoutTextScale(0.31f),
+                Color.FromArgb(231, 199, 142),
                 Alignment.Center, true, true);
 
             _handTitle = new TextElement(
@@ -162,7 +197,8 @@ namespace TrucoRDR2
 
             _status = new TextElement(
                 "Preparando la mesa...",
-                LayoutPoint(960.0f, 1025.0f), LayoutTextScale(0.39f), Color.WhiteSmoke,
+                LayoutPoint(960.0f, 991.0f), LayoutTextScale(0.33f),
+                Color.FromArgb(232, 213, 181),
                 Alignment.Center, true, true);
 
             _menuOptions = new TextElement(
@@ -643,6 +679,7 @@ namespace TrucoRDR2
             {
                 DrawMenuSurface();
                 DrawTextElement(_header);
+                DrawTextElement(_instructions);
                 DrawTextElement(_menuOptions);
                 DrawTextElement(_menuHint);
                 return;
@@ -769,15 +806,33 @@ namespace TrucoRDR2
 
             for (int i = 0; i < _handSprites.Length; i++)
             {
-                if (i == _selectedCardIndex && !_dealAnimationActive &&
+                bool isSelected = i == _selectedCardIndex && !_dealAnimationActive &&
                     _match.Round.CurrentPlayer == TrucoPlayer.Player &&
-                    !_match.Round.IsComplete && !_match.Round.HasPendingResponse)
+                    !_match.Round.IsComplete && !_match.Round.HasPendingResponse;
+
+                if (isSelected)
                     DrawSelectedCardFrame(i);
 
                 if (_handSprites[i] != null)
                 {
-                    if (!DrawDealingCard(i))
+                    if (DrawDealingCard(i))
+                        continue;
+
+                    if (isSelected && i < _match.Round.PlayerCards.Count)
+                    {
+                        PointF selectedPosition = new PointF(
+                            _handPositions[i].X - LayoutWidth(3.0f),
+                            _handPositions[i].Y - LayoutHeight(14.0f));
+                        SizeF selectedSize = LayoutSize(HandCardWidth + 6.0f, HandCardHeight + 9.0f);
+                        DrawTransientSprite(
+                            _match.Round.PlayerCards[i].TextureName,
+                            selectedSize,
+                            selectedPosition);
+                    }
+                    else
+                    {
                         _handSprites[i].Draw();
+                    }
                 }
             }
 
@@ -799,6 +854,7 @@ namespace TrucoRDR2
             }
 
             DrawTextElement(_status);
+            DrawActionHints();
         }
 
         private void DrawInitialDeal()
@@ -1603,26 +1659,37 @@ namespace TrucoRDR2
         {
             PointF center = LayoutPoint(960.0f, 535.0f);
             SizeF outer = LayoutSize(790.0f, 430.0f);
+            SizeF frame = LayoutSize(780.0f, 420.0f);
             SizeF inner = LayoutSize(770.0f, 410.0f);
-            DrawRect(center.X, center.Y, outer.Width, outer.Height, 24, 19, 15, 235);
-            DrawRect(center.X, center.Y, inner.Width, inner.Height, 46, 35, 24, 238);
-            DrawRect(center.X, center.Y - LayoutHeight(170.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
-            DrawRect(center.X, center.Y + LayoutHeight(175.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 193, 157, 91, 255);
+            DrawRect(center.X, center.Y, outer.Width, outer.Height, 20, 16, 13, 242);
+            DrawRect(center.X, center.Y, frame.Width, frame.Height, 145, 105, 57, 245);
+            DrawRect(center.X, center.Y, inner.Width, inner.Height, 43, 32, 23, 242);
+            DrawRect(center.X, center.Y - LayoutHeight(170.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 201, 166, 105, 255);
+            DrawRect(center.X, center.Y + LayoutHeight(175.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 201, 166, 105, 210);
         }
 
         private void SetHeaderForMenu(bool menu)
         {
-            _header.Position = LayoutPoint(960.0f, menu ? 340.0f : 65.0f);
+            _header.Position = LayoutPoint(960.0f, menu ? 340.0f : 49.0f);
+            _instructions.Position = LayoutPoint(960.0f, menu ? 401.0f : 88.0f);
+            SetCaption(_instructions, menu
+                ? "CONFIGURACION DE PARTIDA"
+                : "TRUCO ARGENTINO  ·  MANO A MANO");
         }
 
         private void DrawTopPanel()
         {
-            PointF center = LayoutPoint(960.0f, 155.0f);
-            SizeF outer = LayoutSize(1420.0f, 250.0f);
-            SizeF inner = LayoutSize(1404.0f, 234.0f);
-            DrawRect(center.X, center.Y, outer.Width, outer.Height, 18, 16, 13, 220);
-            DrawRect(center.X, center.Y, inner.Width, inner.Height, 32, 27, 21, 218);
-            DrawRect(center.X, center.Y - LayoutHeight(59.0f), LayoutWidth(1320.0f), LayoutHeight(2.0f), 168, 133, 76, 235);
+            PointF center = LayoutPoint(960.0f, 145.0f);
+            SizeF outer = LayoutSize(1420.0f, 230.0f);
+            SizeF inner = LayoutSize(1404.0f, 214.0f);
+            DrawRect(center.X, center.Y, outer.Width, outer.Height, 18, 15, 12, 226);
+            DrawRect(center.X, center.Y, inner.Width, inner.Height, 34, 28, 21, 224);
+
+            // Thin aged-gold rules give the header a framed saloon-sign finish.
+            DrawRect(center.X, center.Y - LayoutHeight(69.0f),
+                LayoutWidth(1320.0f), LayoutHeight(2.0f), 190, 151, 91, 235);
+            DrawRect(center.X, center.Y + LayoutHeight(101.0f),
+                LayoutWidth(1320.0f), LayoutHeight(1.0f), 142, 109, 65, 145);
         }
 
         private void DrawTableSurface()
@@ -1642,14 +1709,21 @@ namespace TrucoRDR2
             if (index < 0 || index >= _handPositions.Length)
                 return;
 
-            PointF position = _handPositions[index];
-            SizeF cardSize = LayoutSize(HandCardWidth, HandCardHeight);
+            PointF position = new PointF(
+                _handPositions[index].X - LayoutWidth(3.0f),
+                _handPositions[index].Y - LayoutHeight(14.0f));
+            SizeF cardSize = LayoutSize(HandCardWidth + 6.0f, HandCardHeight + 9.0f);
             float centerX = position.X + cardSize.Width / 2.0f;
             float centerY = position.Y + cardSize.Height / 2.0f;
-            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(10.0f),
-                cardSize.Height + LayoutHeight(10.0f), 225, 190, 101, 255);
-            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(4.0f),
-                cardSize.Height + LayoutHeight(4.0f), 46, 34, 24, 255);
+
+            // A soft outer halo, dark separator and warm metal edge keep the focus visible
+            // without obscuring the Spanish card artwork.
+            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(22.0f),
+                cardSize.Height + LayoutHeight(22.0f), 205, 163, 96, 65);
+            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(12.0f),
+                cardSize.Height + LayoutHeight(12.0f), 42, 31, 21, 245);
+            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(5.0f),
+                cardSize.Height + LayoutHeight(5.0f), 218, 181, 127, 255);
         }
 
         private void DrawOpponentCardBacks()
@@ -1804,19 +1878,21 @@ namespace TrucoRDR2
 
             SetCaption(_scoreboard,
                 "VOS  " + _match.PlayerScore + "   -   " + _match.OpponentScore + "  RIVAL" +
-                "       |       " + _match.TargetPoints + " PUNTOS       |       " + _match.ScorePhase);
+                "       |       " + _match.TargetPoints + " PUNTOS");
 
             string first = round.Tricks.Count > 0 ? FormatTrick(round.Tricks[0]) : "-";
             string second = round.Tricks.Count > 1 ? FormatTrick(round.Tricks[1]) : "-";
             string third = round.Tricks.Count > 2 ? FormatTrick(round.Tricks[2]) : "-";
             SetCaption(_roundInfo,
-                "MANO: " + (round.Mano == TrucoPlayer.Player ? "VOS" : "RIVAL") +
-                "    |    RIVAL: " + round.OpponentCards.Count + " cartas" +
-                "    |    BAZAS: " + first + " / " + second + " / " + third);
+                _match.ScorePhase + "    ·    MANO: " +
+                (round.Mano == TrucoPlayer.Player ? "VOS" : "RIVAL") +
+                "    ·    BAZAS: " + first + " / " + second + " / " + third);
 
+            string stakeLabel = round.TrucoStake == 1 ? "PUNTO" : "PUNTOS";
             SetCaption(_roundDetails,
-                "TRUCO: " + round.TrucoStake + " punto(s)" +
-                "    |    FLOR: " + (_florEnabled ? "SI" : "NO"));
+                "RIVAL: " + round.OpponentCards.Count + " CARTAS" +
+                "    ·    TRUCO: " + round.TrucoStake + " " + stakeLabel +
+                "    ·    FLOR: " + (_florEnabled ? "SI" : "NO"));
 
             string announcement = round.LastAnnouncement;
             if (!string.IsNullOrEmpty(_match.LastScoreEvent) &&
@@ -1834,10 +1910,10 @@ namespace TrucoRDR2
 
             if (_match.IsComplete)
                 return (_match.Winner == TrucoPlayer.Player ? "GANASTE LA PARTIDA" : "EL RIVAL GANO LA PARTIDA") +
-                       ". ENTER: volver al menú.";
+                       "  ·  ENTER PARA VOLVER AL MENU.";
             if (round.IsComplete)
-                return (round.Winner == TrucoPlayer.Player ? "Ganaste la mano" : "El rival ganó la mano") +
-                       " (" + round.PointsAwardedForHand + " puntos). ENTER: siguiente mano.";
+                return (round.Winner == TrucoPlayer.Player ? "GANASTE LA MANO" : "EL RIVAL GANO LA MANO") +
+                       "  ·  " + round.PointsAwardedForHand + " PUNTOS  ·  ENTER PARA SEGUIR.";
 
             if (round.HasPendingResponse && round.PendingResponder == TrucoPlayer.Player)
             {
@@ -1852,31 +1928,16 @@ namespace TrucoRDR2
                 string offerValue = isTrucoOffer
                     ? "por " + (round.PendingValue + 1) + " puntos (no querido: " + round.PendingValue + ")"
                     : (faltaCallsWholeMatch ? "por la partida" : round.PendingValue + " punto(s)");
-                string response = "RIVAL CANTA " + TrucoRound.CallName(round.PendingCall) +
-                                  " (" + offerValue + "). Q=QUIERO / N=NO QUIERO";
-                if (round.PendingCall == TrucoCall.Envido)
-                    response += " / E, R o F para subir";
-                else if (round.PendingCall == TrucoCall.RealEnvido)
-                    response += " / F para Falta";
-                else if (round.PendingCall == TrucoCall.Truco || round.PendingCall == TrucoCall.Retruco)
-                {
-                    response += " / T para subir";
-                    if (round.CardsPlayed == 0)
-                        response += " / E-R-F para cantar envido primero";
-                }
-                else if (round.PendingCall == TrucoCall.Flor)
-                    response += " / C contra flor";
-                else if (round.PendingCall == TrucoCall.ContraFlor)
-                    response += " / B contra flor al resto";
-                return response;
+                return "EL RIVAL CANTA " + TrucoRound.CallName(round.PendingCall) +
+                       "  ·  " + offerValue.ToUpperInvariant() + ".";
             }
 
             if (round.HasPendingResponse)
-                return "Esperando respuesta del rival...";
+                return "ESPERANDO LA RESPUESTA DEL RIVAL...";
 
             if (round.CurrentPlayer == TrucoPlayer.Player)
-                return "TU TURNO: flechas + ENTER | E ENVIDO | R REAL | F FALTA | T TRUCO | M MAZO";
-            return "Turno del rival...";
+                return "TU TURNO.";
+            return "TURNO DEL RIVAL...";
         }
 
         private void UpdateHandLabels()
@@ -1887,7 +1948,7 @@ namespace TrucoRDR2
                 string caption = string.Empty;
                 if (cards != null && i < cards.Count)
                 {
-                    string prefix = i == _selectedCardIndex ? "> " : "  ";
+                    string prefix = i == _selectedCardIndex ? "◆ " : "  ";
                     caption = prefix + (i + 1) + ". " + FormatCardName(cards[i]);
                 }
                 SetCaption(_handLabels[i], caption);
@@ -1932,12 +1993,175 @@ namespace TrucoRDR2
                 DrawTextElement(_playedLabels[i]);
             DrawHandLabels();
             DrawTextElement(_status);
+            DrawActionHints();
         }
 
         private void DrawHandLabels()
         {
             for (int i = 0; i < _handLabels.Length; i++)
                 DrawTextElement(_handLabels[i]);
+        }
+
+        private void UpdateActionHints()
+        {
+            for (int i = 0; i < _actionHints.Length; i++)
+                _actionHints[i].Enabled = false;
+
+            if (_match == null || _match.Round == null)
+                return;
+
+            TrucoRound round = _match.Round;
+            if (_match.IsComplete)
+            {
+                SetActionHint("VOLVER AL MENU", true);
+                return;
+            }
+
+            if (round.IsComplete)
+            {
+                SetActionHint("SIGUIENTE MANO", true);
+                return;
+            }
+
+            if (round.HasPendingResponse)
+            {
+                if (round.PendingResponder != TrucoPlayer.Player)
+                    return;
+
+                SetActionHint("QUIERO", true);
+                SetActionHint("NO QUIERO", true);
+
+                if (round.PendingCall == TrucoCall.Envido ||
+                    round.PendingCall == TrucoCall.RealEnvido)
+                {
+                    SetActionHint("ENVIDO", round.CanRaiseEnvido(TrucoPlayer.Player, TrucoCall.Envido));
+                    SetActionHint("REAL", round.CanRaiseEnvido(TrucoPlayer.Player, TrucoCall.RealEnvido));
+                    SetActionHint("FALTA", round.CanRaiseEnvido(TrucoPlayer.Player, TrucoCall.FaltaEnvido));
+                }
+                else if (round.PendingCall == TrucoCall.Truco ||
+                         round.PendingCall == TrucoCall.Retruco)
+                {
+                    SetActionHint("TRUCO", true);
+                    if (round.CardsPlayed == 0 && round.CanCallEnvido(TrucoPlayer.Player))
+                    {
+                        SetActionHint("ENVIDO", true);
+                        SetActionHint("REAL", true);
+                        SetActionHint("FALTA", true);
+                    }
+                }
+                else if (round.PendingCall == TrucoCall.Flor)
+                {
+                    SetActionHint("CONTRA FLOR",
+                        round.CanRaiseFlor(TrucoPlayer.Player, TrucoCall.ContraFlor));
+                }
+                else if (round.PendingCall == TrucoCall.ContraFlor)
+                {
+                    SetActionHint("CONTRA FLOR AL RESTO",
+                        round.CanRaiseFlor(TrucoPlayer.Player, TrucoCall.ContraFlorAlResto));
+                }
+
+                return;
+            }
+
+            if (round.CurrentPlayer != TrucoPlayer.Player)
+                return;
+
+            if (round.PlayerCards.Count > 0 && _textureDictionaryLoaded)
+            {
+                SetActionHint("ELEGIR", true);
+                SetActionHint("JUGAR", true);
+            }
+
+            if (round.CanCallEnvido(TrucoPlayer.Player))
+            {
+                SetActionHint("ENVIDO", true);
+                SetActionHint("REAL", true);
+                SetActionHint("FALTA", true);
+            }
+
+            if (round.CanCallTruco(TrucoPlayer.Player))
+                SetActionHint("TRUCO", true);
+
+            SetActionHint("MAZO", true);
+        }
+
+        private void SetActionHint(string label, bool enabled)
+        {
+            if (!enabled)
+                return;
+
+            for (int i = 0; i < _actionHints.Length; i++)
+            {
+                if (string.Equals(_actionHints[i].Label, label, StringComparison.Ordinal))
+                {
+                    _actionHints[i].Enabled = true;
+                    return;
+                }
+            }
+        }
+
+        private void DrawActionHints()
+        {
+            UpdateActionHints();
+
+            const float keyScale = 0.29f;
+            const float labelScale = 0.28f;
+            const float y = 1030.0f;
+            float keyTextScale = LayoutTextScale(keyScale);
+            float labelTextScale = LayoutTextScale(labelScale);
+            float totalWidth = 0.0f;
+            int visibleCount = 0;
+
+            for (int i = 0; i < _actionHints.Length; i++)
+            {
+                ActionHint hint = _actionHints[i];
+                if (!hint.Enabled)
+                    continue;
+
+                totalWidth += LayoutWidth(hint.KeyWidth + 12.0f) +
+                    EstimateTextWidth(hint.Label, labelTextScale) + LayoutWidth(20.0f);
+                visibleCount++;
+            }
+
+            if (visibleCount == 0)
+                return;
+
+            float x = RDR2.UI.Screen.Width * 0.5f - totalWidth * 0.5f;
+
+            for (int i = 0; i < _actionHints.Length; i++)
+            {
+                ActionHint hint = _actionHints[i];
+                if (!hint.Enabled)
+                    continue;
+
+                float keyWidth = LayoutWidth(hint.KeyWidth);
+                PointF capCenter = LayoutPoint(x + keyWidth * 0.5f, 1040.0f);
+                SizeF capOuter = LayoutSize(hint.KeyWidth + 4.0f, 34.0f);
+                SizeF capInner = LayoutSize(hint.KeyWidth, 30.0f);
+                DrawRect(capCenter.X, capCenter.Y, capOuter.Width, capOuter.Height,
+                    176, 132, 72, 235);
+                DrawRect(capCenter.X, capCenter.Y, capInner.Width, capInner.Height,
+                    38, 29, 21, 248);
+
+                TextElement keyText = new TextElement(
+                    hint.Key,
+                    LayoutPoint(x + keyWidth * 0.5f, y),
+                    keyTextScale,
+                    Color.FromArgb(236, 205, 151),
+                    Alignment.Center, true, true);
+                DrawTextElement(keyText);
+
+                float labelX = x + keyWidth + LayoutWidth(8.0f);
+                TextElement labelText = new TextElement(
+                    hint.Label,
+                    LayoutPoint(labelX, y),
+                    labelTextScale,
+                    Color.FromArgb(230, 224, 211),
+                    Alignment.Left, true, true);
+                DrawTextElement(labelText);
+
+                x = labelX + EstimateTextWidth(hint.Label, labelTextScale) + LayoutWidth(20.0f);
+            }
         }
 
         private void DrawTextElement(TextElement element)
