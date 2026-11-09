@@ -1100,7 +1100,7 @@ namespace TrucoRDR2
             try
             {
                 if (_interactionPrompt != 0 &&
-                    Function.Call<bool>(PromptIsValid, _interactionPrompt))
+                    Function.Call<bool>((Hash)PromptIsValid, _interactionPrompt))
                 {
                     Function.Call((Hash)PromptDelete, _interactionPrompt);
                 }
