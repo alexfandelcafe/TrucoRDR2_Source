@@ -323,7 +323,7 @@ namespace TrucoRDR2
             }
 
             int boneIndex = Function.Call<int>(
-                GetEntityBoneIndexByNameNative,
+                (Hash)GetEntityBoneIndexByNameNative,
                 ped.Handle,
                 "SKEL_L_Finger13");
             if (boneIndex < 0)
@@ -934,15 +934,15 @@ namespace TrucoRDR2
             {
                 HUD._UI_PROMPT_SET_CONTROL_ACTION(prompt, PromptControlHash);
                 string promptText = Function.Call<string>(
-                    PromptVarString, 10, "LITERAL_STRING", "Jugar al truco");
-                Function.Call(PromptSetText, prompt, promptText);
+                    (Hash)PromptVarString, 10, "LITERAL_STRING", "Jugar al truco");
+                Function.Call((Hash)PromptSetText, prompt, promptText);
                 HUD._UI_PROMPT_SET_STANDARDIZED_HOLD_MODE(prompt, StandardizedHoldMode);
                 HUD._UI_PROMPT_SET_GROUP(prompt, group, 0);
                 HUD._UI_PROMPT_REGISTER_END(prompt);
                 HUD._UI_PROMPT_SET_VISIBLE(prompt, false);
                 HUD._UI_PROMPT_SET_ENABLED(prompt, false);
 
-                if (!Function.Call<bool>(PromptIsValid, prompt))
+                if (!Function.Call<bool>((Hash)PromptIsValid, prompt))
                     throw new InvalidOperationException(
                         "RDR2 rechazó el prompt nativo después de registrarlo.");
 
@@ -1049,19 +1049,19 @@ namespace TrucoRDR2
                     _opponent.IsGettingUp ||
                     _opponent.IsHogtying ||
                     _opponent.IsLassoed ||
-                    Function.Call<bool>(IsEntityDead, ped) ||
-                    Function.Call<bool>(IsEntityOnFire, ped) ||
-                    Function.Call<bool>(IsPedInjured, ped) ||
-                    Function.Call<bool>(IsPedDeadOrDying, ped, true) ||
-                    Function.Call<bool>(IsPedFleeing, ped) ||
-                    Function.Call<bool>(IsPedInCombat, ped, playerHandle) ||
-                    Function.Call<bool>(IsPedShooting, ped) ||
-                    Function.Call<bool>(IsPedFalling, ped) ||
-                    Function.Call<bool>(IsPedBeingStunned, ped, 0) ||
-                    Function.Call<bool>(IsPedRagdoll, ped) ||
-                    Function.Call<bool>(IsPedHogtied, ped) ||
-                    Function.Call<bool>(IsPedFallingOver, ped) ||
-                    Function.Call<bool>(IsPedGettingUp, ped))
+                    Function.Call<bool>((Hash)IsEntityDead, ped) ||
+                    Function.Call<bool>((Hash)IsEntityOnFire, ped) ||
+                    Function.Call<bool>((Hash)IsPedInjured, ped) ||
+                    Function.Call<bool>((Hash)IsPedDeadOrDying, ped, true) ||
+                    Function.Call<bool>((Hash)IsPedFleeing, ped) ||
+                    Function.Call<bool>((Hash)IsPedInCombat, ped, playerHandle) ||
+                    Function.Call<bool>((Hash)IsPedShooting, ped) ||
+                    Function.Call<bool>((Hash)IsPedFalling, ped) ||
+                    Function.Call<bool>((Hash)IsPedBeingStunned, ped, 0) ||
+                    Function.Call<bool>((Hash)IsPedRagdoll, ped) ||
+                    Function.Call<bool>((Hash)IsPedHogtied, ped) ||
+                    Function.Call<bool>((Hash)IsPedFallingOver, ped) ||
+                    Function.Call<bool>((Hash)IsPedGettingUp, ped))
                     return false;
 
                 // Scenario start was successfully requested during world setup.
@@ -1081,7 +1081,7 @@ namespace TrucoRDR2
             try
             {
                 if (_interactionPrompt == 0 ||
-                    !Function.Call<bool>(PromptIsValid, _interactionPrompt))
+                    !Function.Call<bool>((Hash)PromptIsValid, _interactionPrompt))
                     return;
 
                 if (!enabled)
@@ -1100,9 +1100,9 @@ namespace TrucoRDR2
             try
             {
                 if (_interactionPrompt != 0 &&
-                    Function.Call<bool>(PromptIsValid, _interactionPrompt))
+                    Function.Call<bool>((Hash)PromptIsValid, _interactionPrompt))
                 {
-                    Function.Call(PromptDelete, _interactionPrompt);
+                    Function.Call((Hash)PromptDelete, _interactionPrompt);
                 }
             }
             catch
@@ -1153,7 +1153,7 @@ namespace TrucoRDR2
             {
                 if (_opponent != null && _opponent.Exists() && !_opponent.IsDeadOrDying)
                 {
-                    Function.Call(ClearPedSecondaryTaskNative, _opponent.Handle);
+                    Function.Call((Hash)ClearPedSecondaryTaskNative, _opponent.Handle);
                 }
             }
             catch
