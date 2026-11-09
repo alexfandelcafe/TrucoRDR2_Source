@@ -202,7 +202,7 @@ namespace TrucoRDR2
 
             _menuHint = new TextElement(
                 string.Empty,
-                LayoutPoint(960.0f, 710.0f), LayoutTextScale(0.34f), Color.Wheat,
+                LayoutPoint(960.0f, 680.0f), LayoutTextScale(0.34f), Color.Wheat,
                 Alignment.Center, true, true);
 
             for (int i = 0; i < 3; i++)
@@ -309,7 +309,8 @@ namespace TrucoRDR2
             }
 
             SetCaption(_menuHint,
-                "ARRIBA / ABAJO: ELEGIR     IZQUIERDA / DERECHA: CAMBIAR     ENTER: INICIAR     ESC: CERRAR");
+                "ARRIBA / ABAJO: ELEGIR     IZQUIERDA / DERECHA: CAMBIAR\n" +
+                "ENTER: INICIAR     ESC: CERRAR");
         }
 
         public void ContinueAfterResult()
