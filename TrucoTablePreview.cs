@@ -79,7 +79,7 @@ namespace TrucoRDR2
         private readonly ActionHint[] _actionHints =
         {
             new ActionHint("← →", "ELEGIR", 48.0f),
-            new ActionHint("ENTER", "JUGAR", 58.0f),
+            new ActionHint("ENTER", "JUGAR", 66.0f),
             new ActionHint("E", "ENVIDO", 27.0f),
             new ActionHint("R", "REAL", 27.0f),
             new ActionHint("F", "FALTA", 27.0f),
@@ -787,8 +787,7 @@ namespace TrucoRDR2
                 if (_opponentRevealSprites[i] != null)
                     _opponentRevealSprites[i].Draw();
 
-            // Add dark label plates first, then draw all text after card sprites so it cannot
-            // flicker underneath or be covered by a sprite rendered later in the frame.
+            // Draw the cards first; labels and controls are layered above them.
 
             for (int i = 0; i < _playedSprites.Length; i++)
             {
@@ -2118,7 +2117,7 @@ namespace TrucoRDR2
                 if (!hint.Enabled)
                     continue;
 
-                totalWidth += LayoutWidth(hint.KeyWidth + 12.0f) +
+                totalWidth += LayoutWidth(hint.KeyWidth + 8.0f) +
                     EstimateTextWidth(hint.Label, labelTextScale) + LayoutWidth(20.0f);
                 visibleCount++;
             }
