@@ -65,13 +65,10 @@ namespace TrucoRDR2
         private readonly PointF[] _playedPositions;
         private readonly PointF[] _opponentCardBackPositions;
 
-        private readonly TextElement _header;
-        private readonly TextElement _instructions;
         private readonly TextElement _scoreboard;
         private readonly TextElement _roundInfo;
         private readonly TextElement _roundDetails;
         private readonly TextElement _announcement;
-        private readonly TextElement _handTitle;
         private readonly TextElement _status;
         private readonly TextElement _menuOptions;
         private readonly TextElement _menuHint;
@@ -156,18 +153,6 @@ namespace TrucoRDR2
                 LayoutPoint(1116.0f, 285.0f)
             };
 
-            _header = new TextElement(
-                "TRUCO RDR2",
-                LayoutPoint(960.0f, 49.0f), LayoutTextScale(0.74f),
-                Color.FromArgb(239, 213, 169),
-                Alignment.Center, true, true);
-
-            _instructions = new TextElement(
-                "TRUCO ARGENTINO  ·  MANO A MANO",
-                LayoutPoint(960.0f, 88.0f), LayoutTextScale(0.30f),
-                Color.FromArgb(215, 205, 188),
-                Alignment.Center, true, true);
-
             _scoreboard = new TextElement(
                 string.Empty,
                 LayoutPoint(960.0f, 137.0f), LayoutTextScale(0.57f), Color.White,
@@ -188,11 +173,6 @@ namespace TrucoRDR2
                 string.Empty,
                 LayoutPoint(960.0f, 222.0f), LayoutTextScale(0.31f),
                 Color.FromArgb(231, 199, 142),
-                Alignment.Center, true, true);
-
-            _handTitle = new TextElement(
-                "TUS CARTAS",
-                LayoutPoint(960.0f, 665.0f), LayoutTextScale(0.45f), Color.Wheat,
                 Alignment.Center, true, true);
 
             _status = new TextElement(
@@ -263,7 +243,6 @@ namespace TrucoRDR2
                     _worldInteraction.PlayHoldingCardsIdle();
             }
 
-            SetHeaderForMenu(_showMenu);
             _nextComputerActionUtc = DateTime.UtcNow.AddSeconds(ComputerThinkSeconds);
             UpdateHandLabels();
         }
@@ -272,7 +251,6 @@ namespace TrucoRDR2
         {
             _match = new TrucoMatch(_targetPoints, _florEnabled, _random);
             _showMenu = false;
-            SetHeaderForMenu(false);
             _selectedCardIndex = 0;
             _playedCardAnimation = null;
             _spritesCreated = false;
@@ -327,7 +305,6 @@ namespace TrucoRDR2
             {
                 _match = null;
                 _showMenu = true;
-                SetHeaderForMenu(true);
                 _menuSelection = 0;
                 DisposeSprites();
                 _spritesCreated = false;
@@ -362,7 +339,6 @@ namespace TrucoRDR2
             _showMenu = true;
             _menuSelection = 0;
             _handIdleAnimationApplied = false;
-            SetHeaderForMenu(true);
             UpdateMenuText();
             UpdateHandLabels();
 
@@ -678,8 +654,6 @@ namespace TrucoRDR2
             if (_showMenu)
             {
                 DrawMenuSurface();
-                DrawTextElement(_header);
-                DrawTextElement(_instructions);
                 DrawTextElement(_menuOptions);
                 DrawTextElement(_menuHint);
                 return;
@@ -835,13 +809,10 @@ namespace TrucoRDR2
                 }
             }
 
-            DrawTextElement(_header);
-            DrawTextElement(_instructions);
             DrawTextElement(_scoreboard);
             DrawTextElement(_roundInfo);
             DrawTextElement(_roundDetails);
             DrawTextElement(_announcement);
-            DrawTextElement(_handTitle);
 
             for (int i = 0; i < _playedLabels.Length; i++)
                 DrawTextElement(_playedLabels[i]);
@@ -1663,17 +1634,7 @@ namespace TrucoRDR2
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 20, 16, 13, 242);
             DrawRect(center.X, center.Y, frame.Width, frame.Height, 145, 105, 57, 245);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 43, 32, 23, 242);
-            DrawRect(center.X, center.Y - LayoutHeight(170.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 201, 166, 105, 255);
             DrawRect(center.X, center.Y + LayoutHeight(175.0f), LayoutWidth(620.0f), LayoutHeight(2.0f), 201, 166, 105, 210);
-        }
-
-        private void SetHeaderForMenu(bool menu)
-        {
-            _header.Position = LayoutPoint(960.0f, menu ? 340.0f : 49.0f);
-            _instructions.Position = LayoutPoint(960.0f, menu ? 401.0f : 88.0f);
-            SetCaption(_instructions, menu
-                ? "CONFIGURACION DE PARTIDA"
-                : "TRUCO ARGENTINO  ·  MANO A MANO");
         }
 
         private void DrawTopPanel()
@@ -1684,9 +1645,7 @@ namespace TrucoRDR2
             DrawRect(center.X, center.Y, outer.Width, outer.Height, 18, 15, 12, 226);
             DrawRect(center.X, center.Y, inner.Width, inner.Height, 34, 28, 21, 224);
 
-            // Thin aged-gold rules give the header a framed saloon-sign finish.
-            DrawRect(center.X, center.Y - LayoutHeight(69.0f),
-                LayoutWidth(1320.0f), LayoutHeight(2.0f), 190, 151, 91, 235);
+            // A single lower gold rule keeps the panel separated without crossing its content.
             DrawRect(center.X, center.Y + LayoutHeight(101.0f),
                 LayoutWidth(1320.0f), LayoutHeight(1.0f), 142, 109, 65, 145);
         }
@@ -1715,14 +1674,9 @@ namespace TrucoRDR2
             float centerX = position.X + cardSize.Width / 2.0f;
             float centerY = position.Y + cardSize.Height / 2.0f;
 
-            // A soft outer halo, dark separator and warm metal edge keep the focus visible
-            // without obscuring the Spanish card artwork.
+            // Keep only the subtle translucent highlight behind the selected card.
             DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(22.0f),
                 cardSize.Height + LayoutHeight(22.0f), 205, 163, 96, 65);
-            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(12.0f),
-                cardSize.Height + LayoutHeight(12.0f), 42, 31, 21, 245);
-            DrawRect(centerX, centerY, cardSize.Width + LayoutWidth(5.0f),
-                cardSize.Height + LayoutHeight(5.0f), 218, 181, 127, 255);
         }
 
         private void DrawOpponentCardBacks()
@@ -1981,13 +1935,10 @@ namespace TrucoRDR2
         {
             DrawOpponentCardBacks();
 
-            DrawTextElement(_header);
-            DrawTextElement(_instructions);
             DrawTextElement(_scoreboard);
             DrawTextElement(_roundInfo);
             DrawTextElement(_roundDetails);
             DrawTextElement(_announcement);
-            DrawTextElement(_handTitle);
             for (int i = 0; i < _playedLabels.Length; i++)
                 DrawTextElement(_playedLabels[i]);
             DrawHandLabels();
